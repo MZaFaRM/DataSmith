@@ -1,4 +1,3 @@
-
 export type CliResponse<T> = Record<string, unknown> & {
   status: "ok" | "error"
   payload?: T
@@ -11,9 +10,7 @@ export type CliRequest<T> = Record<string, unknown> & {
   body?: T
 }
 
-export type DBDialectType =
-  | "mysql"
-  | "unknown"
+export type DBDialectType = "MYSQL" | "UNKNOWN" | "POSTGRESQL"
 
 export interface DBCreds {
   id?: number

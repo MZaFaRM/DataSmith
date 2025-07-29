@@ -421,6 +421,7 @@ export default function InsertionPanel({
                 icon={`meteocons:${timeOfDay}-fill`}
                 className="margin-auto h-16 w-16"
               />
+              <p className="ml-1 text-sm font-medium">Start by connecting to a database.</p>
             </div>
           ) : (
             <div className="flex h-full items-center justify-center bg-muted">

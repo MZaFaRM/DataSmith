@@ -108,8 +108,23 @@ class DbCredsSchema(BaseModel):
 
 
 class DBDialectType(str, enum.Enum):
-    MYSQL = "mysql"
-    UNKNOWN = "unknown"
+    MYSQL = "MYSQL"
+    POSTGRESQL = "POSTGRESQL"
+    UNKNOWN = "UNKNOWN"
+    # MSSQL = "MSSQL"
+    # ORACLE = "oracle"
+    # MARIADB = "mariadb"
+    # FIREBIRD = "firebird"
+
+
+DIALECT_URLS = {
+    "MYSQL": "mysql+pymysql://{user}:{password}@{host}:{port}/{name}",
+    "POSTGRESQL": "postgresql+psycopg2://{user}:{password}@{host}:{port}/{name}",
+    # DBDialectType.MSSQL: "mssql+pyodbc://{user}:{password}@{host}:{port}/{name}?driver=ODBC+Driver+17+for+SQL+Server",
+    # DBDialectType.ORACLE: "oracle+cx_oracle://{user}:{password}@{host}:{port}/{name}",
+    # DBDialectType.MARIADB: "mariadb+pymysql://{user}:{password}@{host}:{port}/{name}",
+    # DBDialectType.FIREBIRD: "firebird+fdb://{user}:{password}@{host}/{name}",
+}
 
 
 class UsageStatSchema(BaseModel):

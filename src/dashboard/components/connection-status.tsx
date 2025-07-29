@@ -32,6 +32,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -182,50 +189,53 @@ export default function ConnectionSelector({
       })
   }
 
-  function handleNewDbConnection() {
+  async function handleNewDbConnection() {
+    if (!newDbCreds || !newDbCreds.dialect) return
+
     setDbConnecting(true)
 
-    invokeDbConnection({
-      host: newDbCreds?.host || "localhost",
-      port: newDbCreds?.port || "3306",
-      user: newDbCreds?.user ?? "root",
-      name: newDbCreds?.name ?? "",
-      password: newDbCreds?.password ?? "",
-      dialect: newDbCreds?.dialect || "mysql",
-    })
-      .then((res) => {
-        // console.log("Connected to the database:", res)
-        if (res) {
-          handleListDbCreds()
-          updateDb(res)
+    try {
+      if (!newDbCreds.dialect) {
+        throw new Error("Select a DB dialect.")
+      }
 
-          setTimeout(() => {
-            setNewDbCreds(null)
-            setShowDialog(false)
-          }, 1000)
-        } else {
-          throw new Error("Connection failed")
-        }
+      const res = await invokeDbConnection({
+        host: newDbCreds.host || "localhost",
+        port: newDbCreds.port || "3306",
+        user: newDbCreds.user ?? "root",
+        name: newDbCreds.name ?? "",
+        password: newDbCreds.password ?? "",
+        dialect: newDbCreds.dialect || "MYSQL",
       })
-      .catch((error) => {
+
+      if (!res) throw new Error("Connection failed")
+
+      handleListDbCreds()
+      updateDb(res)
+
+      setTimeout(() => {
+        setNewDbCreds(null)
+        setShowDialog(false)
+      }, 1000)
+    } catch (error: any) {
+      const errMsg = error?.message || String(error)
+      console.error("Connection error:", errMsg)
+
+      setNewDbCreds((prev) => ({
+        ...prev!,
+        error: handleErrorField(errMsg),
+      }))
+
+      setTimeout(() => {
+        setErrorField(null)
         setNewDbCreds((prev) => ({
           ...prev!,
-          error: handleErrorField(error?.message || String(error)),
+          error: "",
         }))
-
-        setTimeout(() => {
-          setErrorField(null)
-          setNewDbCreds((prev) => ({
-            ...prev!,
-            error: "",
-          }))
-        }, 3000)
-
-        console.error("Connection error:", error)
-      })
-      .finally(() => {
-        setDbConnecting(false)
-      })
+      }, 3000)
+    } finally {
+      setDbConnecting(false)
+    }
   }
 
   return (
@@ -393,37 +403,50 @@ export default function ConnectionSelector({
           <div>
             <div className="space-y-4 py-2 pb-4">
               <div>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className="w-full cursor-not-allowed justify-start opacity-70"
-                      disabled
-                    >
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start">
                       <Icon
-                        icon="logos:mysql-icon"
-                        className="mr-2 h-5 w-5 text-muted-foreground"
+                        icon={
+                          newDbCreds?.dialect === "POSTGRESQL"
+                            ? "logos:postgresql"
+                            : newDbCreds?.dialect === "MYSQL"
+                              ? "logos:mysql-icon"
+                              : "solar:database-bold-duotone"
+                        }
+                        className="mr-2 h-5 w-5"
                       />
-                      MySQL (Working on more dialects)
+                      {newDbCreds?.dialect || "DB Dialect"}
                       <CaretSortIcon className="ml-auto h-4 w-4" />
                     </Button>
-                  </PopoverTrigger>
-                  <PopoverContent>
-                    <Command>
-                      <CommandList>
-                        <CommandItem key="mysql" value="mysql" disabled>
-                          <div className="flex items-center">
-                            <Icon
-                              icon="logos:mysql-icon"
-                              className="mr-2 h-5 w-5"
-                            />
-                            MySQL
-                          </div>
-                        </CommandItem>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-[460px]">
+                    <DropdownMenuRadioGroup
+                      value={newDbCreds?.dialect}
+                      onValueChange={(val) =>
+                        setNewDbCreds((prev) => ({
+                          ...prev!,
+                          dialect: val as DBDialectType,
+                        }))
+                      }
+                    >
+                      <DropdownMenuRadioItem value="MYSQL">
+                        <Icon
+                          icon="logos:mysql-icon"
+                          className="mr-2 h-4 w-4"
+                        />
+                        MYSQL
+                      </DropdownMenuRadioItem>
+                      <DropdownMenuRadioItem value="POSTGRESQL">
+                        <Icon
+                          icon="logos:postgresql"
+                          className="mr-2 h-4 w-4"
+                        />
+                        POSTGRESQL
+                      </DropdownMenuRadioItem>
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div

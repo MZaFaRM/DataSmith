@@ -21,6 +21,7 @@ from core.utils.exceptions import (
     MissingRequiredAttributeError,
 )
 from core.utils.types import (
+    DIALECT_URLS,
     ColumnMetadata,
     ColumnSpec,
     DbCredsSchema,
@@ -94,12 +95,22 @@ class DatabaseFactory:
     @property
     def url(self) -> str:
         if not hasattr(self, "_url") or self._url == "":
-            if self.user and self.password and self.host and self.port and self.name:
-                self._url = f"mysql+pymysql://{quote_plus(self.user)}:{quote_plus(self.password)}@{self.host}:{self.port}/{quote_plus(self.name)}"
-            else:
+            if not all([self.user, self.password, self.host, self.port, self.name]):
                 raise MissingRequiredAttributeError(
                     "Required arguments for url: user, password, host, port and name not set."
                 )
+
+            dialect = self.dialect.value.lower()
+            if dialect not in DIALECT_URLS:
+                raise ValueError(f"Unsupported dialect: {self.dialect}")
+
+            self._url = DIALECT_URLS[DBDialectType(dialect)].format(
+                user=quote_plus(self.user),
+                password=quote_plus(self.password),
+                host=self.host,
+                port=self.port,
+                name=quote_plus(self.name),
+            )
         return self._url
 
     @property
