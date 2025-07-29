@@ -26,6 +26,7 @@
     "withGlobalTauri": true
   },
   "bundle": {
+    "publisher": "MZaFaRM",
     "active": true,
     "targets": "all",
     "externalBin": ["../sidecar/populator"],
