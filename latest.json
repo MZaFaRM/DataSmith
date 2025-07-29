@@ -1,19 +1,19 @@
 {
-  "version": "1.9.0",
+  "version": "1.8.0",
   "notes": "First iteration completed. Initial release.",
   "pub_date": "2025-07-29T12:00:00Z",
   "platforms": {
     "windows-x86_64": {
       "signature": "abc123==",
-      "url": "https://yourdomain.com/app_1.9.0_x64_en-US.msi"
+      "url": "https://yourdomain.com/app_1.8.0_x64_en-US.msi"
     },
     "linux-x86_64": {
       "signature": "def456==",
-      "url": "https://yourdomain.com/app_1.9.0_amd64.AppImage"
+      "url": "https://yourdomain.com/app_1.8.0_amd64.AppImage"
     },
     "darwin-x86_64": {
       "signature": "ghi789==",
-      "url": "https://yourdomain.com/app_1.9.0_x64.dmg"
+      "url": "https://yourdomain.com/app_1.8.0_x64.dmg"
     }
   }
 }
