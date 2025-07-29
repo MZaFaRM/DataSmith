@@ -100,11 +100,10 @@ class DatabaseFactory:
                     "Required arguments for url: user, password, host, port and name not set."
                 )
 
-            dialect = self.dialect.value.lower()
-            if dialect not in DIALECT_URLS:
+            if self.dialect not in DIALECT_URLS:
                 raise ValueError(f"Unsupported dialect: {self.dialect}")
 
-            self._url = DIALECT_URLS[DBDialectType(dialect)].format(
+            self._url = DIALECT_URLS[self.dialect].format(
                 user=quote_plus(self.user),
                 password=quote_plus(self.password),
                 host=self.host,

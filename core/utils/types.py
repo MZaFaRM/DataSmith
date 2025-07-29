@@ -118,8 +118,8 @@ class DBDialectType(str, enum.Enum):
 
 
 DIALECT_URLS = {
-    "MYSQL": "mysql+pymysql://{user}:{password}@{host}:{port}/{name}",
-    "POSTGRESQL": "postgresql+psycopg2://{user}:{password}@{host}:{port}/{name}",
+    DBDialectType.MYSQL: "mysql+pymysql://{user}:{password}@{host}:{port}/{name}",
+    DBDialectType.POSTGRESQL: "postgresql+psycopg2://{user}:{password}@{host}:{port}/{name}",
     # DBDialectType.MSSQL: "mssql+pyodbc://{user}:{password}@{host}:{port}/{name}?driver=ODBC+Driver+17+for+SQL+Server",
     # DBDialectType.ORACLE: "oracle+cx_oracle://{user}:{password}@{host}:{port}/{name}",
     # DBDialectType.MARIADB: "mariadb+pymysql://{user}:{password}@{host}:{port}/{name}",

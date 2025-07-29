@@ -190,15 +190,11 @@ export default function ConnectionSelector({
   }
 
   async function handleNewDbConnection() {
-    if (!newDbCreds || !newDbCreds.dialect) return
+    if (!newDbCreds) return
 
     setDbConnecting(true)
 
     try {
-      if (!newDbCreds.dialect) {
-        throw new Error("Select a DB dialect.")
-      }
-
       const res = await invokeDbConnection({
         host: newDbCreds.host || "localhost",
         port: newDbCreds.port || "3306",
@@ -404,9 +400,9 @@ export default function ConnectionSelector({
             <div className="space-y-4 py-2 pb-4">
               <div>
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+                  <DropdownMenuTrigger asChild disabled>
                     <Button variant="outline" className="w-full justify-start">
-                      <Icon
+                      {/* <Icon
                         icon={
                           newDbCreds?.dialect === "POSTGRESQL"
                             ? "logos:postgresql"
@@ -417,7 +413,12 @@ export default function ConnectionSelector({
                         className="mr-2 h-5 w-5"
                       />
                       {newDbCreds?.dialect || "DB Dialect"}
-                      <CaretSortIcon className="ml-auto h-4 w-4" />
+                      <CaretSortIcon className="ml-auto h-4 w-4" /> */}
+                      <Icon
+                          icon="logos:mysql-icon"
+                          className="mr-2 h-4 w-4"
+                        />
+                        MySQL (Working on other dialects)
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="w-[460px]">
@@ -430,14 +431,14 @@ export default function ConnectionSelector({
                         }))
                       }
                     >
-                      <DropdownMenuRadioItem value="MYSQL">
+                      <DropdownMenuRadioItem value="MYSQL" disabled>
                         <Icon
                           icon="logos:mysql-icon"
                           className="mr-2 h-4 w-4"
                         />
                         MYSQL
                       </DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="POSTGRESQL">
+                      <DropdownMenuRadioItem value="POSTGRESQL" disabled>
                         <Icon
                           icon="logos:postgresql"
                           className="mr-2 h-4 w-4"
