@@ -47,7 +47,7 @@ If you’d like to build it yourself or contribute, follow the instructions belo
    python -m venv venv
    source venv/Scripts/activate  # On Unix: source venv/bin/activate
    pip install -r requirements.txt
-   python -m PyInstaller populator.spec
+   python build.py
    ```
 
 3. **Set up the frontend**
@@ -57,11 +57,7 @@ If you’d like to build it yourself or contribute, follow the instructions belo
    pnpm tauri dev
    ```
 
-4. **Build the final app**
-
-   ```bash
-   pnpm tauri build
-   ```
+4. **Done!**
 
 ## 🚀 Usage
 
