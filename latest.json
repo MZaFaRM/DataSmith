@@ -4,16 +4,12 @@
   "pub_date": "2025-07-29T12:00:00Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSb1gxOGdGV1NoMm1tMkd0TEdOcWlKRDVXWk1tbXVzcUI4VkRxL0Y1NlUyZUtHa1Q2THJLbW1hTDh6T0tlTzl5NkI0d1BEQk9kS1dYb0VUb0RvSklRSkFsQ1ZjMTRuUVFRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzUzODE1MzA3CWZpbGU6RGF0YVNtaXRoXzEuOC4wX3g2NC1zZXR1cC5leGUKTlhPOVFGRWMzWmhEQ3Z1RlNpOW9ZWVZQa1cxeTM3T2tETDB3dGtJV3I4Y1NXYUk0UnVtWHZVTHkvSnNDWjRkcnNHc0I4MnRram1HMTMxM1lpVHdRRHc9PQo=",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSb1gxOGdGV1NoMnJ3dWk3M1g3SDlxMTZBcEV4a3dwZkhqTW03UzJzd2dPY3BpUEhmNmxDWXFXRFBJanFjR1EzWXgwZVNINmJCdU8vWFF2NGZFR2xVcUJZSkZXNFgvbGdJPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzUzODk5NzM4CWZpbGU6RGF0YVNtaXRoXzEuOC4wX3g2NC1zZXR1cC5leGUKVmFUdGxjdWpxQ2JseG1rQmtDcGxiZTE0bERXVlZLclpEa3doRXpua3VoUTM0MzZUNGoxTzI5WGFvbEQ4Ymd5R0RkWm5MZG42anJodjcwVnJ1UXl4Q1E9PQo=",
       "url": "https://github.com/MZaFaRM/DataSmith/releases/download/v1.8.0/DataSmith_1.8.0_x64-setup.exe"
     },
     "linux-x86_64": {
       "signature": "def456==",
-      "url": "https://yourdomain.com/app_1.8.0_amd64.AppImage"
-    },
-    "darwin-x86_64": {
-      "signature": "ghi789==",
-      "url": "https://yourdomain.com/app_1.8.0_x64.dmg"
+      "url": "https://github.com/MZaFaRM/DataSmith/releases/download/v1.8.0/DataSmith_1.8.0_amd64.AppImage"
     }
   }
 }
