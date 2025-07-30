@@ -1,6 +1,8 @@
 import os
+from platformdirs import user_data_dir
 
-BASE_PATH = os.path.join(os.path.expanduser("~"), ".datasmith")
+APP_NAME = "DataSmith"
+BASE_PATH = user_data_dir(appname=APP_NAME, appauthor=False)
 DB_PATH = os.path.join(BASE_PATH, "config.db")
 LOG_PATH = os.path.join(BASE_PATH, "logs")
 
