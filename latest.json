@@ -8,7 +8,7 @@
       "url": "https://github.com/MZaFaRM/DataSmith/releases/download/v1.8.0/DataSmith_1.8.0_x64-setup.exe"
     },
     "linux-x86_64": {
-      "signature": "def456==",
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSb1gxOGdGV1NoMnYzNVFUQ01ZUXhnVk9EOXpTVzRtTnY3ZTFmMXJKTG9HdWlpaXhEaHRKb1ZsdGFrVXhEVmVLa3VuWGk1UENsakNSYzRsMDQxSkpBaTNINGg1VzB1c3dBPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzUzOTAzMDczCWZpbGU6RGF0YVNtaXRoXzEuOC4wX2FtZDY0LkFwcEltYWdlCjdXczB1OGpiZ055Ukg0cG9GWWJLaE1LN2tNNlNKWVUyRjJPQ295QkxhME1OdWFpak1nQ2x6d3lZQU42NHg4Nk5oL25kVmNKV1ROdkltbm9jQTM4TURBPT0K",
       "url": "https://github.com/MZaFaRM/DataSmith/releases/download/v1.8.0/DataSmith_1.8.0_amd64.AppImage"
     }
   }
