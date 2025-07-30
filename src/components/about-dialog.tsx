@@ -3,7 +3,6 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { UpdateIcon } from "@radix-ui/react-icons"
 import { getName, getTauriVersion, getVersion } from "@tauri-apps/api/app"
 import { arch } from "@tauri-apps/plugin-os"
-import { relaunch } from "@tauri-apps/plugin-process"
 import { open } from "@tauri-apps/plugin-shell"
 import { check, Update } from "@tauri-apps/plugin-updater"
 import { GithubIcon } from "lucide-react"
@@ -43,30 +42,6 @@ export function AboutDialog() {
         setUpdateText("You have the latest version.")
       } else {
         setUpdateText(`Found new version ${update.version}`)
-
-        let downloaded: number = 0
-        let contentLength: number | undefined = 0
-
-        await update.downloadAndInstall((event) => {
-          switch (event.event) {
-            case "Started":
-              contentLength = event.data.contentLength
-              setUpdateText(
-                `started downloading ${event.data.contentLength} bytes`
-              )
-              break
-            case "Progress":
-              downloaded += event.data.chunkLength
-              setUpdateText(`downloaded ${downloaded} from ${contentLength}`)
-              break
-            case "Finished":
-              setUpdateText("download finished")
-              break
-          }
-        })
-
-        setUpdateText("update installed")
-        await relaunch()
       }
     } catch (error) {
       setUpdateText("Couldn't update due to some exceptions.")
@@ -76,7 +51,7 @@ export function AboutDialog() {
     }
   }
 
-  async function handleUpdate() {}
+
 
   return (
     <DialogContent className="overflow-clip pb-2">
