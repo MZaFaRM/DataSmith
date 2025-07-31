@@ -1,9 +1,10 @@
+import binascii
 import logging
 import os
 import platform
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote_plus
@@ -503,18 +504,32 @@ class DatabaseFactory:
             "MSSQL": ("[", "]"),
         }
         l, r = DIALECT_QUOTES.get(self.dialect.upper(), ('"', '"'))
-        
+
         def quote(ident: str) -> str:
             return f"{l}{ident}{r}" if l else ident
 
-        def sql_literal(val: str | None) -> str:
-            if val is None or val == "NULL":
+        def sql_literal(val) -> str:
+            if val is None or (isinstance(val, str) and val.upper() == "NULL"):
                 return "NULL"
-            return "'" + val.replace("'", "''") + "'"
+
+            if isinstance(val, bool):
+                return "TRUE" if val else "FALSE"
+
+            if isinstance(val, (int, float)):
+                return str(val)
+
+            if isinstance(val, (datetime)):
+                return f"'{val.isoformat(sep=' ')}'"
+
+            if isinstance(val, bytes):
+                hex_str = binascii.hexlify(val).decode("utf-8")
+                return f"'{hex_str}'"
+
+            return "'" + str(val).replace("'", "''") + "'"
 
         sql = (
-            f"INSERT INTO `{table_name}` (\n"
-            f"  {', '.join(f'`{col}`' for col in packet.columns)}\n"
+            f"INSERT INTO {quote(table_name)} (\n"
+            f"  {', '.join(f'{quote(col)}' for col in packet.columns)}\n"
             f") VALUES\n"
             + ",\n".join(
                 f"  ({', '.join(sql_literal(item) for item in entry)})"
