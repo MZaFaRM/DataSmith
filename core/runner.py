@@ -349,7 +349,7 @@ class Runner:
     def _handle_set_db_export(self, body: dict) -> dict:
         try:
             path = body.pop("path")
-            packet = self.populator.get_packet_page(packet_id=body["packet_id"])
+            packet = self.populator.get_packet_page(packet_id=body["packet_id"], safe=False)
             self.dbf.export_sql_packet(packet, path)
             return self._ok(f"SQL packet exported to {path}")
         except Exception as e:

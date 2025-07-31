@@ -518,8 +518,11 @@ class DatabaseFactory:
             if isinstance(val, (int, float)):
                 return str(val)
 
-            if isinstance(val, (datetime)):
+            if isinstance(val, datetime):
                 return f"'{val.isoformat(sep=' ')}'"
+            
+            if isinstance(val, date):
+                return f"'{val.isoformat()}'"
 
             if isinstance(val, bytes):
                 hex_str = binascii.hexlify(val).decode("utf-8")
