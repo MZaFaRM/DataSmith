@@ -25,7 +25,6 @@ export function AboutDialog() {
   const [name, setName] = useState("")
   const [tauriVersion, setTauriVersion] = useState("")
   const [arc, setArc] = useState("")
-  const [update, setUpdate] = useState<Update | null>(null)
   const [loading, setLoading] = useState(false)
 
   getVersion().then((x) => setVersion(x))
@@ -37,7 +36,6 @@ export function AboutDialog() {
     setLoading(true)
     try {
       const update = await check()
-      setUpdate(update)
       if (!update) {
         setUpdateText("You have the latest version.")
       } else {
@@ -50,8 +48,6 @@ export function AboutDialog() {
       setLoading(false)
     }
   }
-
-
 
   return (
     <DialogContent className="overflow-clip pb-2">
@@ -100,8 +96,8 @@ export function AboutDialog() {
           className="h-7 gap-1"
           onClick={() => handleUpdateCheck()}
         >
-          <UpdateIcon className={cn(loading && "animate-spin")} />{" "}
-          {update ? "Update" : "Check for Updates"}
+          <UpdateIcon className={cn(loading && "animate-spin")} /> Check for
+          Updates
         </Button>
         <DialogPrimitive.Close
           type="submit"
