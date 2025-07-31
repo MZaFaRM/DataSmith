@@ -4,14 +4,14 @@ from numbers import Number
 import random
 import re
 import traceback
-from typing import Callable, Generator
+from typing import Any, Callable, Generator
 import uuid
 
 from faker import Faker
 import faker
 import rstr
 
-from core.helpers import cap_string
+from core.helpers import cap_string, cap_numeric
 from core.utils.exceptions import ValidationError, ValidationWarning, VerificationError
 from core.utils.types import ColumnMetadata, ColumnSpec, ErrorPacket
 from core.utils.types import GeneratorType as GType
@@ -106,9 +106,11 @@ class Populator:
             for page_idx, i in enumerate(range(0, total_entries, page_size))
         ]
 
-        return self._cached_packets[0]
+        return self.get_packet_page(id, 0)
 
-    def get_packet_page(self, packet_id: str, page: int | None = None) -> TablePacket:
+    def get_packet_page(
+        self, packet_id: str, page: int | None = None, safe=True
+    ) -> TablePacket:
         if not hasattr(self, "_cached_packets") or not self._cached_packets:
             raise ValueError(
                 "No cached packet found. Please generate the packet first."
@@ -120,15 +122,26 @@ class Populator:
             )
 
         if page is None:
-            packet = self._cached_packets[0]
+            packet = self._cached_packets[0].model_copy(deep=True)
         else:
-            packet = self._cached_packets[page]
+            packet = self._cached_packets[page].model_copy(deep=True)
 
         if packet.id == packet_id:
             if page is None:
+                # If page is None, return all packets combined
                 entries = [entry for p in self._cached_packets for entry in p.entries]
                 packet.entries = entries
-                return packet
+
+            if safe:
+                safe_entries = list(
+                    map(
+                        lambda row: [
+                            str(cell) if cell is not None else None for cell in row
+                        ],
+                        packet.entries,
+                    )
+                )
+                packet.entries = safe_entries
             return packet
 
         raise ValueError(f"No packet found for ID {packet_id} on page {page}.")
@@ -145,7 +158,7 @@ class Populator:
         errors: list[ErrorPacket] = []
 
         if not ordered_columns:
-            return errors, {col.name: [None] for col in metadata.columns}
+            return errors, {}
 
         context = ContextFactory(
             row_idx=0,
@@ -154,8 +167,7 @@ class Populator:
             col_spec=ordered_columns[0],
             filled=[],
             entries={
-                col.name: [None] * table_spec.no_of_entries
-                for col in table_spec.columns
+                col.name: [None] * table_spec.no_of_entries for col in ordered_columns
             },
         )
 
@@ -215,7 +227,13 @@ class Populator:
 
             context.row_idx += 1
 
-        return errors, context.entries
+        entries = {
+            col.name: context.entries[col.name]
+            for col in metadata.columns
+            if col.name in [c.name for c in ordered_columns]
+        }
+
+        return errors, entries
 
     # endregion
 
@@ -232,9 +250,11 @@ class Populator:
 
         def needs_check(type: GType) -> bool:
             return type not in {
+                GType.foreign,
                 GType.autoincrement,
                 GType.computed,
                 GType.null,
+                GType.constant,
             }
 
         for c_spec in specs:
@@ -356,13 +376,13 @@ class GeneratorFactory:
 
     def make(
         self, type: GType
-    ) -> Callable[[ContextFactory], Generator[str | None, None, None]]:
+    ) -> Callable[[ContextFactory], Generator[Any, None, None]]:
         make_fn = getattr(self, f"make_{type.value}", None)
         if make_fn is None or not callable(make_fn):
             raise ValueError(f"Unknown generator type: {type}")
         return make_fn  # type: ignore
 
-    def make_faker(self, context: ContextFactory) -> Generator[str | None, None, None]:
+    def make_faker(self, context: ContextFactory) -> Generator[Any, None, None]:
         faker_fn = getattr(self.faker, context.col_spec.generator or "")
         col = context.column
         while True:
@@ -371,9 +391,9 @@ class GeneratorFactory:
                 val = cap_string(val, col.length)
             elif isinstance(val, Number):
                 val = cap_numeric(val, col.precision, col.scale)  # type: ignore
-            yield str(val)
+            yield val
 
-    def make_python(self, context: ContextFactory) -> Generator[str | None, None, None]:
+    def make_python(self, context: ContextFactory) -> Generator[Any, None, None]:
         try:
             tree = ast.parse(context.col_spec.generator or "")
 
@@ -393,14 +413,14 @@ class GeneratorFactory:
                     key: context.entries[key][context.row_idx]
                     for key in context.entries
                 }
-                yield str(gen(columns=columns))
+                yield gen(columns=columns)
 
         except SyntaxError as e:
             raise VerificationError(f"Syntax Error in Python script: {e}")
         except Exception as e:
             raise Exception(str(e), str(traceback.format_exc()))
 
-    def make_regex(self, context: ContextFactory) -> Generator[str | None, None, None]:
+    def make_regex(self, context: ContextFactory) -> Generator[Any, None, None]:
         col = context.column
         regex_fn = lambda: rstr.xeger(context.col_spec.generator or "")
         while True:
@@ -409,11 +429,9 @@ class GeneratorFactory:
                 val = cap_string(val, col.length)
             elif isinstance(val, Number):
                 val = cap_numeric(val, col.precision, col.scale)  # type: ignore
-            yield str(val)
+            yield val
 
-    def make_foreign(
-        self, context: ContextFactory
-    ) -> Generator[str | None, None, None]:
+    def make_foreign(self, context: ContextFactory) -> Generator[Any, None, None]:
         column = context.column
         fk = column.foreign_keys
         cache = context.cache
@@ -438,19 +456,7 @@ class GeneratorFactory:
         while True:
             yield random.choice(rows)
 
-    def make_autoincrement(
-        self, context: ContextFactory
-    ) -> Generator[str | None, None, None]:
-        while True:
-            yield None
-
-    def make_computed(
-        self, context: ContextFactory
-    ) -> Generator[str | None, None, None]:
-        while True:
-            yield None
-
-    def make_null(self, context: ContextFactory) -> Generator[str | None, None, None]:
+    def make_null(self, context: ContextFactory) -> Generator[None, None, None]:
         while True:
             yield None
 
@@ -495,19 +501,4 @@ class GeneratorFactory:
     def check_regex(self, generator: str):
         # This will raise an error if the regex is invalid
         re.compile(generator)
-        return True
-
-    def check_foreign(self, generator: str):
-        return True
-
-    def check_autoincrement(self, generator: str):
-        return True
-
-    def check_computed(self, generator: str):
-        return True
-
-    def check_null(self, generator: str):
-        return True
-
-    def check_constant(self, generator: str):
         return True

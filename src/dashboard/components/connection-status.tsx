@@ -10,6 +10,7 @@ import {
 } from "@/api/db"
 import { Icon } from "@iconify/react"
 import { CaretSortIcon, CheckIcon } from "@radix-ui/react-icons"
+import { set } from "date-fns"
 import { Eye, EyeOff } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -195,13 +196,18 @@ export default function ConnectionSelector({
     setDbConnecting(true)
 
     try {
+      if (!newDbCreds.dialect) {
+        setErrorField("dialect")
+        throw new Error("Please select a database dialect.")
+      }
+
       const res = await invokeDbConnection({
         host: newDbCreds.host || "localhost",
         port: newDbCreds.port || "3306",
         user: newDbCreds.user ?? "root",
         name: newDbCreds.name ?? "",
         password: newDbCreds.password ?? "",
-        dialect: newDbCreds.dialect || "MYSQL",
+        dialect: newDbCreds.dialect || "UNKNOWN",
       })
 
       if (!res) throw new Error("Connection failed")
@@ -399,55 +405,15 @@ export default function ConnectionSelector({
           <div>
             <div className="space-y-4 py-2 pb-4">
               <div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild disabled>
-                    <Button variant="outline" className="w-full justify-start">
-                      {/* <Icon
-                        icon={
-                          newDbCreds?.dialect === "POSTGRESQL"
-                            ? "logos:postgresql"
-                            : newDbCreds?.dialect === "MYSQL"
-                              ? "logos:mysql-icon"
-                              : "solar:database-bold-duotone"
-                        }
-                        className="mr-2 h-5 w-5"
-                      />
-                      {newDbCreds?.dialect || "DB Dialect"}
-                      <CaretSortIcon className="ml-auto h-4 w-4" /> */}
-                      <Icon
-                          icon="logos:mysql-icon"
-                          className="mr-2 h-4 w-4"
-                        />
-                        MySQL (Working on other dialects)
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent className="w-[460px]">
-                    <DropdownMenuRadioGroup
-                      value={newDbCreds?.dialect}
-                      onValueChange={(val) =>
-                        setNewDbCreds((prev) => ({
-                          ...prev!,
-                          dialect: val as DBDialectType,
-                        }))
-                      }
-                    >
-                      <DropdownMenuRadioItem value="MYSQL" disabled>
-                        <Icon
-                          icon="logos:mysql-icon"
-                          className="mr-2 h-4 w-4"
-                        />
-                        MYSQL
-                      </DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="POSTGRESQL" disabled>
-                        <Icon
-                          icon="logos:postgresql"
-                          className="mr-2 h-4 w-4"
-                        />
-                        POSTGRESQL
-                      </DropdownMenuRadioItem>
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <DialectDropdown
+                  value={newDbCreds?.dialect}
+                  onChange={(val) =>
+                    setNewDbCreds((prev) => ({
+                      ...prev!,
+                      dialect: val,
+                    }))
+                  }
+                />
               </div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div
@@ -596,5 +562,85 @@ export default function ConnectionSelector({
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+const DIALECTS: {
+  value: DBDialectType
+  label: string
+  icon: string
+  className?: string
+}[] = [
+  {
+    value: "MYSQL",
+    label: "MYSQL",
+    icon: "skill-icons:mysql-light",
+  },
+  {
+    value: "POSTGRESQL",
+    label: "POSTGRESQL",
+    icon: "logos:postgresql",
+  },
+  {
+    value: "MSSQL",
+    label: "MSSQL (Experimental)",
+    icon: "streamline-ultimate-color:microsoft-logo",
+  },
+  {
+    value: "ORACLE",
+    label: "ORACLE (Experimental)",
+    icon: "cib:oracle",
+    className: "text-red-500",
+  },
+  {
+    value: "MARIADB",
+    label: "MARIADB (Experimental)",
+    icon: "logos:mariadb-icon",
+  },
+  {
+    value: "FIREBIRD",
+    label: "FIREBIRD (Experimental)",
+    icon: "devicon:firebird",
+  },
+]
+
+function DialectDropdown({
+  value,
+  onChange,
+}: {
+  value?: string
+  onChange: (val: DBDialectType) => void
+}) {
+  const current = DIALECTS.find((d) => d.value === value)
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" className="w-full justify-start">
+          <Icon
+            icon={current?.icon || "logos:database"}
+            className={`mr-2 h-5 w-5 ${current?.className || ""}`}
+          />
+          {current?.label || "Select a DB Dialect"}
+          <CaretSortIcon className="ml-auto h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-[460px]">
+        <DropdownMenuRadioGroup
+          value={value}
+          onValueChange={(val) => onChange(val as DBDialectType)}
+        >
+          {DIALECTS.map((d) => (
+            <DropdownMenuRadioItem key={d.value} value={d.value}>
+              <Icon
+                icon={d.icon}
+                className={`mr-2 h-4 w-4 ${d.className || ""}`}
+              />
+              {d.label}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

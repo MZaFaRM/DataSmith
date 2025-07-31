@@ -198,7 +198,9 @@ export default function RenderPreview({
         toast({
           variant: "destructive",
           title: "Error inserting data",
-          description: err.message || "Unknown error occurred",
+          description: err.message
+            ? err.message.slice(0, 250) + "\nCheck Log for more details."
+            : "Unknown error occurred",
         })
       })
       .finally(() => {
@@ -297,7 +299,12 @@ export default function RenderPreview({
   }
 
   return (
-    <div className={cn("flex h-full flex-col overflow-auto", loading && "cursor-wait")}>
+    <div
+      className={cn(
+        "flex h-full flex-col overflow-auto",
+        loading && "cursor-wait"
+      )}
+    >
       <div
         className={cn(
           "bg-current-foreground flex h-full flex-col items-center justify-center rounded-md bg-gradient-to-br text-gray-800",
@@ -323,7 +330,7 @@ export default function RenderPreview({
               value={((progress?.row ?? 0) / (progress?.total ?? 1)) * 100}
             />
           </div>
-          <p className="text-sm font-regular text-muted-foreground mt-2 w-full text-center">
+          <p className="font-regular mt-2 w-full text-center text-sm text-muted-foreground">
             {progress?.eta ? progress.eta : "Calculating ETA..."}
           </p>
         </div>
@@ -331,9 +338,9 @@ export default function RenderPreview({
       <div className={cn("flex-1 overflow-auto", loading && "hidden")}>
         <Table key={tableSpec?.name || "unknown"}>
           <TableHeader>
-            {tablePacket ? (
+            {tablePacket && (tablePacket?.columns?.length ?? 0) > 0 ? (
               <TableRow>
-                {tablePacket.columns?.map((column) => (
+                {tablePacket.columns!.map((column) => (
                   <TableHead
                     title={
                       (errorCols && errorCols[column]) ||
@@ -367,6 +374,7 @@ export default function RenderPreview({
           </TableHeader>
           <TableBody>
             {tablePacket &&
+              (tablePacket?.columns?.length ?? 0) > 0 &&
               (() => {
                 const columns = tablePacket.columns ?? []
                 const entries = tablePacket.entries ?? []
@@ -401,13 +409,14 @@ export default function RenderPreview({
               })()}
           </TableBody>
         </Table>
-        {!tablePacket && (
-          <div className="flex h-full items-center justify-center text-muted-foreground">
-            <p className="text-sm font-medium">
-              Preview your generated data here.
-            </p>
-          </div>
-        )}
+        {!tablePacket ||
+          (!tablePacket.columns && (
+            <div className="flex h-full items-center justify-center text-muted-foreground">
+              <p className="text-sm font-medium">
+                Preview your generated data here.
+              </p>
+            </div>
+          ))}
       </div>
       <div className="sticky bottom-0 mt-auto flex items-center justify-center bg-muted p-2">
         <div>

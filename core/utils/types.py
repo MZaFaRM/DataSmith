@@ -1,6 +1,6 @@
 from datetime import datetime
 import enum
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 import uuid
 from pydantic import BaseModel
 from sqlalchemy import Column, ColumnElement
@@ -85,7 +85,7 @@ class TablePacket(BaseModel):
     id: str
     name: str
     columns: list[str]
-    entries: list[list[str | None]]
+    entries: list[list[Any]]
     errors: list[ErrorPacket] = []
 
     page: int
@@ -111,19 +111,19 @@ class DBDialectType(str, enum.Enum):
     MYSQL = "MYSQL"
     POSTGRESQL = "POSTGRESQL"
     UNKNOWN = "UNKNOWN"
-    # MSSQL = "MSSQL"
-    # ORACLE = "oracle"
-    # MARIADB = "mariadb"
-    # FIREBIRD = "firebird"
+    MSSQL = "MSSQL"
+    ORACLE = "ORACLE"
+    MARIADB = "MARIADB"
+    FIREBIRD = "FIREBIRD"
 
 
 DIALECT_URLS = {
     DBDialectType.MYSQL: "mysql+pymysql://{user}:{password}@{host}:{port}/{name}",
     DBDialectType.POSTGRESQL: "postgresql+psycopg2://{user}:{password}@{host}:{port}/{name}",
-    # DBDialectType.MSSQL: "mssql+pyodbc://{user}:{password}@{host}:{port}/{name}?driver=ODBC+Driver+17+for+SQL+Server",
-    # DBDialectType.ORACLE: "oracle+cx_oracle://{user}:{password}@{host}:{port}/{name}",
-    # DBDialectType.MARIADB: "mariadb+pymysql://{user}:{password}@{host}:{port}/{name}",
-    # DBDialectType.FIREBIRD: "firebird+fdb://{user}:{password}@{host}/{name}",
+    DBDialectType.MSSQL: "mssql+pyodbc://{user}:{password}@{host}:{port}/{name}?driver=ODBC+Driver+17+for+SQL+Server",
+    DBDialectType.ORACLE: "oracle+cx_oracle://{user}:{password}@{host}:{port}/{name}",
+    DBDialectType.MARIADB: "mariadb+pymysql://{user}:{password}@{host}:{port}/{name}",
+    DBDialectType.FIREBIRD: "firebird+fdb://{user}:{password}@{host}/{name}",
 }
 
 

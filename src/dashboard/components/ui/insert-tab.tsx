@@ -309,10 +309,6 @@ function RenderGenerator({
     setGeneratorInput(selected || null)
     if (generatorType === "foreign") {
       setSelected(`${column.foreignKeys?.table}__${column.foreignKeys?.column}`)
-    } else if (generatorType === "autoincrement") {
-      setSelected("autoincrement")
-    } else if (generatorType === "computed") {
-      setSelected("computed")
     } else if (generatorType === "null") {
       setSelected("null")
     }
@@ -435,8 +431,8 @@ function RenderGenerator({
       />
     </div>
   ) : generatorType === "constant" ? (
-    <div className="w-[350px] items-center rounded border bg-muted flex">
-      <Icon icon="oui:vis-text" className="h-6 w-6 m-2 mr-2" />
+    <div className="flex w-[350px] items-center rounded border bg-muted">
+      <Icon icon="oui:vis-text" className="m-2 mr-2 h-6 w-6" />
       <Input
         placeholder="Constant value"
         className="rounded-none border-0"

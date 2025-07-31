@@ -339,7 +339,7 @@ class Runner:
     @requires("packet_id")
     def _handle_set_db_insert(self, body: dict) -> dict:
         try:
-            packet = self.populator.get_packet_page(packet_id=body["packet_id"])
+            packet = self.populator.get_packet_page(packet_id=body["packet_id"], safe=False)
             self.dbf.insert_packet(packet)
             return self._ok({"pending_writes": self.dbf.uncommitted})
         except Exception as e:

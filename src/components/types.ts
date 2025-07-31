@@ -10,7 +10,14 @@ export type CliRequest<T> = Record<string, unknown> & {
   body?: T
 }
 
-export type DBDialectType = "MYSQL" | "UNKNOWN" | "POSTGRESQL"
+export type DBDialectType =
+  | "MYSQL"
+  | "UNKNOWN"
+  | "POSTGRESQL"
+  | "MSSQL"
+  | "ORACLE"
+  | "MARIADB"
+  | "FIREBIRD"
 
 export interface DBCreds {
   id?: number

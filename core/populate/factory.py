@@ -10,7 +10,15 @@ from urllib.parse import quote_plus
 
 import networkx as nx
 from networkx import Graph
-from sqlalchemy import Connection, create_engine, inspect
+from sqlalchemy import (
+    Connection,
+    MetaData,
+    Table,
+    create_engine,
+    insert,
+    inspect,
+    select,
+)
 from sqlalchemy import text as sql_text
 from sqlalchemy.engine import Engine, Inspector
 from sqlalchemy.engine.reflection import Inspector
@@ -429,12 +437,14 @@ class DatabaseFactory:
         return fk_map
 
     def get_existing_values(self, table: str, column: str) -> list[str]:
+        meta = MetaData()
+        tbl = Table(table, meta, autoload_with=self.engine)
+        col = tbl.c[column]
+
+        stmt = select(col).where(col.is_not(None))
+
         with self.engine.connect() as conn:
-            result = conn.execute(
-                sql_text(
-                    f"SELECT `{column}` FROM `{table}` WHERE `{column}` IS NOT NULL"
-                )
-            )
+            result = conn.execute(stmt)
             values = [row[0] for row in result]
         return values
 
@@ -458,25 +468,23 @@ class DatabaseFactory:
         return {"log": banner, "prompt": self.dialect}
 
     def insert_packet(self, packet: TablePacket):
-        table_name = packet.name
         if not packet.columns or not packet.entries:
             raise ValueError("Missing columns and/or entries.")
 
+        meta = MetaData()
+        tbl = Table(packet.name, meta, autoload_with=self.engine)
         entries = [dict(zip(packet.columns, entry)) for entry in packet.entries]
 
-        sql = f"""
-            INSERT INTO `{table_name}` ({', '.join(packet.columns)})
-            VALUES ({', '.join([f':{col}' for col in packet.columns])})
-        """
+        stmt = insert(tbl).values(entries)
 
         self.ensure_transaction()
-        self.connection.execute(sql_text(sql), entries)
+        self.connection.execute(stmt)
         self.uncommitted += 1
 
         self.registry.save_usage_stat(
             UsageStatSchema(
                 db_id=self.id,
-                table_name=table_name,
+                table_name=packet.name,
                 new_rows=len(entries),
             )
         )
@@ -486,10 +494,23 @@ class DatabaseFactory:
         if not packet.columns or not packet.entries:
             raise ValueError("Missing columns and/or entries.")
 
+        DIALECT_QUOTES = {
+            "MYSQL": ("`", "`"),
+            "MARIADB": ("`", "`"),
+            "POSTGRESQL": ('"', '"'),
+            "ORACLE": ('"', '"'),
+            "FIREBIRD": ('"', '"'),
+            "MSSQL": ("[", "]"),
+        }
+        l, r = DIALECT_QUOTES.get(self.dialect.upper(), ('"', '"'))
+        
+        def quote(ident: str) -> str:
+            return f"{l}{ident}{r}" if l else ident
+
         def sql_literal(val: str | None) -> str:
-            if val is None or val.upper() == "NULL":
+            if val is None or val == "NULL":
                 return "NULL"
-            return "'" + val.replace("'", "\\'") + "'"
+            return "'" + val.replace("'", "''") + "'"
 
         sql = (
             f"INSERT INTO `{table_name}` (\n"
@@ -515,7 +536,7 @@ class ContextFactory:
     dbf: DatabaseFactory
     table: TableMetadata
     col_spec: ColumnSpec
-    entries: dict[str, list[str | None]]
+    entries: dict[str, list[Any]]
     filled: list[str]
 
     @property

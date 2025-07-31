@@ -1,33 +1,6 @@
-import ast
 from functools import wraps
-import json
-import multiprocessing
-from numbers import Number
-import subprocess
-import sys
 
-import faker
 from pydantic import BaseModel
-
-
-def cap_value(
-    value: str | float | None,
-    length: int | None,
-    precision: int | None,
-    scale: int | None,
-) -> str | float | None:
-    if value is None:
-        return None
-
-    if isinstance(value, str):
-        return cap_string(value, length)
-
-    if isinstance(value, float):
-        return cap_numeric(value, precision, scale)
-
-    raise TypeError(
-        f"Unsupported type for value: {type(value)}. Expected str or float."
-    )
 
 
 def cap_numeric(value: float, precision: int | None, scale: int | None) -> float:
