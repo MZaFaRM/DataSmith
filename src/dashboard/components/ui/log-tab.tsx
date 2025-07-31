@@ -24,7 +24,7 @@ export default function RenderLogs({ activeTab }: { activeTab?: string }) {
     invokeGetLogs()
       .then((logs) => {
         startTransition(() => {
-          setLogs(logs.reverse())
+          setLogs(logs)
         })
       })
       .catch((error) => {
@@ -32,6 +32,27 @@ export default function RenderLogs({ activeTab }: { activeTab?: string }) {
         setLogs([])
       })
   }
+
+  const colorForLog = (log: string): string => {
+    if (/SELECT/.test(log)) return "text-orange-500";
+    if (/INSERT/.test(log)) return "text-purple-500";
+    if (/DELETE/.test(log)) return "text-red-500";
+    if (/ROLLBACK/.test(log)) return "text-lime-500";
+    if (/COMMIT/.test(log)) return "text-green-500";
+    return "text-muted-foreground";
+  };
+
+  const RenderLogs = ({ logs }: { logs: string[] }) => {
+    return (
+      <p className="text-sm p-2 rounded overflow-auto font-medium">
+        {logs.map((log, idx) => (
+          <span key={idx} className={colorForLog(log)}>
+            {log} <br />
+          </span>
+        ))}
+      </p>
+    );
+  };
 
   function clearLogs() {
     invokeClearLogs()
@@ -55,20 +76,7 @@ export default function RenderLogs({ activeTab }: { activeTab?: string }) {
   return (
     <div className="flex-1 overflow-auto">
       <div className="m-4 mt-auto">
-        {logs
-          .slice()
-          .reverse()
-          .map((log, index) => (
-            <p
-              key={index}
-              className={cn(
-                "text-sm text-muted-foreground",
-                index === logs.length - 1 && "font-medium text-slate-400"
-              )}
-            >
-              {log}
-            </p>
-          ))}
+        <RenderLogs logs={logs} />
         {Array.from({ length: 4 }).map((_, index) => (
           <br key={index} />
         ))}

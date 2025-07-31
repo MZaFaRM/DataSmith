@@ -8,6 +8,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote_plus
+from sqlalchemy import event
 
 import networkx as nx
 from networkx import Graph
@@ -137,9 +138,14 @@ class DatabaseFactory:
     @property
     def engine(self) -> Engine:
         if not hasattr(self, "_engine") or self._engine is None:
-            self.setup_logging()
             self._engine = create_engine(self.url, echo=False)
         return self._engine
+
+    @property
+    def logger(self) -> logging.Logger:
+        if not hasattr(self, "_logger") or self._logger is None:
+            self._logger = self.setup_logging()
+        return self._logger
 
     @property
     def inspector(self) -> Inspector:
@@ -157,18 +163,26 @@ class DatabaseFactory:
             self.uncommitted = 0
 
     def commit(self):
+        temp = self.uncommitted
         self.uncommitted = 0
         if hasattr(self, "transaction") and not self.transaction is None:
             self.transaction.commit()
         self.transaction = None
         self.registry.reset_usage_stats(db_id=self.id)
+        self.logger.info(
+            f"COMMITTED {temp} row(s) to {self.name} ({self.dialect.value})"
+        )
 
     def rollback(self):
+        temp = self.uncommitted
         self.uncommitted = 0
         if hasattr(self, "transaction") and not self.transaction is None:
             self.transaction.rollback()
         self.transaction = None
         self.registry.reset_usage_stats(db_id=self.id)
+        self.logger.info(
+            f"ROLLBACK {temp} row(s) in {self.name} ({self.dialect.value})"
+        )
 
     def setup_logging(self):
         logger = logging.getLogger(f"user-sql-{self.name}")
@@ -185,13 +199,7 @@ class DatabaseFactory:
         file_handler.setFormatter(formatter)
 
         logger.addHandler(file_handler)
-
-        for sub in ["sqlalchemy.engine", "sqlalchemy.pool", "sqlalchemy.dialects"]:
-            sub_logger = logging.getLogger(sub)
-            sub_logger.setLevel(logging.INFO)
-            sub_logger.propagate = False
-            sub_logger.handlers.clear()
-            sub_logger.addHandler(file_handler)
+        return logger
 
     def read_logs(self, lines: int = 100) -> list[str]:
         log_file = os.path.join(LOG_PATH, f"{self.name}.sql.log")
@@ -472,23 +480,30 @@ class DatabaseFactory:
         if not packet.columns or not packet.entries:
             raise ValueError("Missing columns and/or entries.")
 
-        meta = MetaData()
-        tbl = Table(packet.name, meta, autoload_with=self.engine)
-        entries = [dict(zip(packet.columns, entry)) for entry in packet.entries]
+        try:
+            meta = MetaData()
+            tbl = Table(packet.name, meta, autoload_with=self.engine)
+            entries = [dict(zip(packet.columns, entry)) for entry in packet.entries]
 
-        stmt = insert(tbl).values(entries)
+            stmt = insert(tbl).values(entries)
+            self.logger.info(stmt)
+            self.logger.info(f"Params: {entries}")
 
-        self.ensure_transaction()
-        self.connection.execute(stmt)
-        self.uncommitted += 1
+            self.ensure_transaction()
+            self.connection.execute(stmt)
+            self.uncommitted += 1
 
-        self.registry.save_usage_stat(
-            UsageStatSchema(
-                db_id=self.id,
-                table_name=packet.name,
-                new_rows=len(entries),
+            self.registry.save_usage_stat(
+                UsageStatSchema(
+                    db_id=self.id,
+                    table_name=packet.name,
+                    new_rows=len(entries),
+                )
             )
-        )
+
+        except Exception as e:
+            self.logger.error(str(e))
+            raise e
 
     def export_sql_packet(self, packet, path: str):
         table_name = packet.name
@@ -520,7 +535,7 @@ class DatabaseFactory:
 
             if isinstance(val, datetime):
                 return f"'{val.isoformat(sep=' ')}'"
-            
+
             if isinstance(val, date):
                 return f"'{val.isoformat()}'"
 
@@ -546,6 +561,7 @@ class DatabaseFactory:
                 f"\n-- Exported at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
             )
             f.write(sql)
+            self.logger.info(f"Exported SQL packet for {table_name} to {path}")
 
 
 @dataclass
