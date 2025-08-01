@@ -49,7 +49,7 @@ class Populator:
 
         table_spec.db_id = dbf.id
         progress["status"] = "validating"
-        _errors, ordered_columns = self._validate_and_sort_specs(table_spec.columns)
+        _errors, ordered_columns = self.base_resolve_specs(table_spec.columns)
 
         progress["status"] = "building"
         errors, column_entries = self.build_table_entries(
@@ -189,7 +189,7 @@ class Populator:
                     col_spec = context.col_spec
                     progress["column"] = col_spec.name
 
-                    for _ in range(10):
+                    for _ in range(25):
                         value = next(gen)
                         if self.is_valid(context, value):
                             context.entries[col_spec.name][entry_index] = value
@@ -230,7 +230,7 @@ class Populator:
         entries = {
             col.name: context.entries[col.name]
             for col in metadata.columns
-            if col.name in [c.name for c in ordered_columns]
+            if col.name in context.entries
         }
 
         return errors, entries
@@ -239,7 +239,7 @@ class Populator:
 
     # region helpers
 
-    def _validate_and_sort_specs(
+    def base_resolve_specs(
         self, specs: list[ColumnSpec]
     ) -> tuple[list[ErrorPacket], list[ColumnSpec]]:
 
@@ -249,13 +249,7 @@ class Populator:
         result_python = {}
 
         def needs_check(type: GType) -> bool:
-            return type not in {
-                GType.foreign,
-                GType.autoincrement,
-                GType.computed,
-                GType.null,
-                GType.constant,
-            }
+            return type not in {GType.autoincrement, GType.computed}
 
         for c_spec in specs:
             try:
@@ -501,4 +495,13 @@ class GeneratorFactory:
     def check_regex(self, generator: str):
         # This will raise an error if the regex is invalid
         re.compile(generator)
+        return True
+
+    def check_foreign(self, generator: str):
+        return True
+
+    def check_null(self, generator: str):
+        return True
+
+    def check_constant(self, generator: str):
         return True

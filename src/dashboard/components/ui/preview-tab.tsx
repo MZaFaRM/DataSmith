@@ -243,9 +243,8 @@ export default function RenderPreview({
   async function handleSaveToFile() {
     if (!tablePacket) return
 
-    const fileName = `${
-      tablePacket?.name || "unnamed_table"
-    }_${new Date().toISOString().replace(/[:.]/g, "-")}.sql`
+    const fileName = `${tablePacket?.name || "unnamed_table"
+      }_${new Date().toISOString().replace(/[:.]/g, "-")}.sql`
 
     const filePath = await save({
       defaultPath: fileName,
@@ -409,14 +408,14 @@ export default function RenderPreview({
               })()}
           </TableBody>
         </Table>
-        {!tablePacket ||
-          (!tablePacket.columns && (
-            <div className="flex h-full items-center justify-center text-muted-foreground">
-              <p className="text-sm font-medium">
-                Preview your generated data here.
-              </p>
-            </div>
-          ))}
+        {(tablePacket?.entries.length ?? 0) == 0 && (
+          <div className="flex h-3/4 items-center justify-center text-muted-foreground">
+            <p className="text-sm font-medium">
+              Configure column specifications from <span className="bg-muted p-1 rounded border">Insert tab</span>
+              {" "}and click on <span className="bg-muted p-1 rounded border">Generate</span> to preview data.
+            </p>
+          </div>
+        )}
       </div>
       <div className="sticky bottom-0 mt-auto flex items-center justify-center bg-muted p-2">
         <div>
