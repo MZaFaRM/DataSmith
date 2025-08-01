@@ -1,6 +1,6 @@
 [package]
 name = "DataSmith"
-version = "1.8.5"
+version = "1.9.0"
 description = "A Tauri-Python application for database population with sample data."
 authors = ["MZaFaRM"]
 license = "MIT"
