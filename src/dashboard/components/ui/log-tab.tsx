@@ -21,7 +21,7 @@ export default function RenderLogs({ activeTab }: { activeTab?: string }) {
   }, [activeTab])
 
   function retrieveLogs() {
-    invokeGetLogs()
+    invokeGetLogs(10)
       .then((logs) => {
         startTransition(() => {
           setLogs(logs)
@@ -44,7 +44,7 @@ export default function RenderLogs({ activeTab }: { activeTab?: string }) {
 
   const RenderLogs = ({ logs }: { logs: string[] }) => {
     return (
-      <p className="text-sm p-2 rounded overflow-auto font-medium">
+      <p className="text-sm p-2 rounded overflow-auto font-medium scrollbar-none">
         {logs.map((log, idx) => (
           <span key={idx} className={colorForLog(log)}>
             {log} <br />

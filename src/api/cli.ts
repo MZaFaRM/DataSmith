@@ -9,7 +9,7 @@ export async function invokeCliRequest<T = unknown, R = unknown>(
 ): Promise<R> {
   const id = Date.now().toString() + Math.random().toString(36).slice(2)
   const taggedReq = { ...req, id }
-  console.log("Invoking CLI request:", taggedReq)
+  // console.log("Invoking CLI request:", taggedReq)
   return new Promise(async (resolve, reject) => {
     const unListen = await once<string>(`py-response-${id}`, (event) => {
       try {

@@ -89,7 +89,7 @@ class Runner:
             self.dbf.from_schema(last_connected)
             try:
                 self.dbf.test_connection()
-                return self._ok(last_connected.model_dump())
+                return self._ok(last_connected.model_dump(mode="json"))
             except Exception as e:
                 self.dbf.disconnect()
                 return self._err(
@@ -142,7 +142,7 @@ class Runner:
 
     @requires()
     def _handle_get_pref_connections(self, _=None) -> dict:
-        creds = [cred.model_dump() for cred in self.dbf.registry.list_creds()]
+        creds = [cred.model_dump(mode="json") for cred in self.dbf.registry.list_creds()]
         return self._ok(creds)
 
     @requires("name", "host", "port", "user")
@@ -194,7 +194,7 @@ class Runner:
         if not metadata:
             return self._err(f"No metadata found for table '{body['name']}'.")
 
-        return self._ok(metadata.model_dump())
+        return self._ok(metadata.model_dump(mode="json"))
 
     @requires(TableSpec, connected=True)
     def _handle_get_gen_packets(self, body: dict) -> dict:
@@ -237,7 +237,7 @@ class Runner:
     @requires("page", "packet_id", connected=True)
     def _handle_get_gen_packet(self, body: dict) -> dict:
         return self._ok(
-            self.populator.get_packet_page(body["packet_id"], body["page"]).model_dump()
+            self.populator.get_packet_page(body["packet_id"], body["page"]).model_dump(mode="json")
         )
 
     @requires()
@@ -304,7 +304,7 @@ class Runner:
             )
             p.start()
 
-            timeout = 10
+            timeout = 20
             start = time.time()
             while time.time() - start < timeout:
                 if not p.is_alive():

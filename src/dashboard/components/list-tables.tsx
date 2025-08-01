@@ -49,7 +49,7 @@ export default function ListTables({
       setActiveTable(null)
     } else {
       fetchTables()
-      console.log("Fetching tables for:", dbCreds.name)
+      // console.log("Fetching tables for:", dbCreds.name)
     }
   }, [dbCreds])
 
@@ -220,11 +220,11 @@ function TableCard({ entry, usageInfo, active, onClick }: TableCardProps) {
         </div>
         <p className="text-sm text-muted-foreground">{parents} parent tables</p>
       </div>
-      <p className="ml-auto text-sm font-semibold text-muted-foreground">
+      <p className="ml-auto text-sm font-semibold text-muted-foreground w-[95px] text-right">
         {rowsCount.totalRows !== 1
           ? new Intl.NumberFormat("en", { notation: "compact" }).format(
-              rowsCount.totalRows
-            ) + " rows"
+            rowsCount.totalRows
+          ) + " rows"
           : "1 row"}
       </p>
     </div>

@@ -26,9 +26,9 @@ def build():
 
     returncode = process.wait()
     if returncode == 0:
-        print("✅ PyInstaller build completed.")
+        print("[OK] PyInstaller build completed.")
     else:
-        print(f"❌ PyInstaller build failed with code {returncode}.")
+        print(f"[ERR] PyInstaller build failed with code {returncode}.")
         sys.exit(returncode)
 
 
@@ -39,7 +39,7 @@ def get_rust_target():
             if line.startswith("host:"):
                 return line.split(":", 1)[1].strip()
     except Exception as e:
-        print(f"⚠️ Couldn't detect Rust target: {e}")
+        print(f"[WARN] Couldn't detect Rust target: {e}")
         return "unknown"
 
 
