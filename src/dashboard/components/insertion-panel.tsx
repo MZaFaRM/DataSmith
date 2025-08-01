@@ -340,12 +340,12 @@ export default function InsertionPanel({
               isActive={activeTab === "sql"}
               onClick={() => handleTabChange("sql")}
             />
-            <TabButton
+            {/* <TabButton
               label="Log"
               icon="octicon:log-16"
               isActive={activeTab === "log"}
               onClick={() => handleTabChange("log")}
-            />
+            /> */}
             <TabButton
               label="Preview"
               icon="lucide:view"
@@ -392,7 +392,7 @@ export default function InsertionPanel({
                   setPendingWrites={setPendingWrites}
                 />
               </div>
-              <div
+              {/* <div
                 ref={logTabRef}
                 className={cn(
                   "relative flex h-full w-full flex-col",
@@ -400,7 +400,7 @@ export default function InsertionPanel({
                 )}
               >
                 <RenderLogs activeTab={activeTab} />
-              </div>
+              </div> */}
               <div
                 className={cn(
                   "relative flex h-full w-full flex-col",
@@ -475,10 +475,6 @@ function HandleTransaction({
 }) {
   const [showCheck, setShowCheck] = useState<boolean>(false)
   const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    // console.log("writes:", pendingWrites)
-  }, [pendingWrites])
 
   function handleCommit() {
     setLoading(true)

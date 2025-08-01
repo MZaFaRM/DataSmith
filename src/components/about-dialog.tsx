@@ -43,7 +43,7 @@ export function AboutDialog() {
       }
     } catch (error) {
       setUpdateText("Couldn't update due to some exceptions.")
-      console.log("Error while updating", error)
+      console.error("Error while updating", error)
     } finally {
       setLoading(false)
     }

@@ -68,9 +68,11 @@ export default function ConnectionSelector({
   const [dbList, setDbList] = useState<DBCreds[]>([])
 
   useEffect(() => {
-    handleListDbCreds()
-    handleSavedDbCreds()
-    handleLastConnected()
+    (async () => {
+      await handleListDbCreds()
+      await handleSavedDbCreds()
+      await handleLastConnected()
+    })()
   }, [])
 
   async function handleLastConnected() {
@@ -78,7 +80,7 @@ export default function ConnectionSelector({
       const lastConnected = await invokeGetLastConnected()
       if (lastConnected && Object.keys(lastConnected).length > 0) {
         updateDb(lastConnected)
-        console.log("Last connected database:", lastConnected)
+        // console.log("Last connected database:", lastConnected)
       } else {
         console.warn("No last connected database found.")
       }
@@ -109,36 +111,29 @@ export default function ConnectionSelector({
     return error
   }
 
-  function handleSavedDbCreds() {
+  async function handleSavedDbCreds() {
     setDbConnecting(true)
-    invokeDbInfo()
-      .then((payload) => {
-        if (payload && payload.id) {
-          handleListDbCreds()
-          updateDb(payload)
-        }
-      })
-      .catch((error) => {
-        console.error("Error fetching database info:", error)
-      })
-      .finally(() => {
-        setDbConnecting(false)
-      })
+    try {
+      const payload = await invokeDbInfo()
+      if (payload && payload.id) {
+        await handleListDbCreds()
+        updateDb(payload)
+      }
+    } catch (error) {
+      console.error("Error fetching database info:", error)
+    } finally {
+      setDbConnecting(false)
+    }
   }
 
-  function handleListDbCreds() {
-    invokeListDbCreds()
-      .then((creds) => {
-        if (creds.length > 0) {
-          setDbList(creds)
-        } else {
-          setDbList([])
-        }
-      })
-      .catch((error) => {
-        console.error("Error fetching database credentials:", error)
-        setDbList([])
-      })
+  async function handleListDbCreds() {
+    try {
+      const creds = await invokeListDbCreds()
+      setDbList(creds.length > 0 ? creds : [])
+    } catch (error) {
+      console.error("Error fetching database credentials:", error)
+      setDbList([])
+    }
   }
 
   async function handleRefresh() {
@@ -164,10 +159,9 @@ export default function ConnectionSelector({
   async function handleDbCredsSelect(creds: DBCreds) {
     setDbConnecting(true)
     updateDb({ ...creds, id: undefined })
-    console.log(creds)
+    // console.log(creds)
     try {
       const data = await invokeDbReconnection(creds)
-      // console.log("Reconnected to the database:", creds)
       updateDb(data)
       setOpen(false)
       setNewDbCreds(null)
@@ -175,19 +169,18 @@ export default function ConnectionSelector({
       console.error("Error reconnecting to the database:", error)
     } finally {
       setDbConnecting(false)
-      handleSavedDbCreds()
+      await handleSavedDbCreds()
     }
   }
 
-  function handleDbCredsRemove(creds: DBCreds) {
-    invokeDbDeletion(creds)
-      .then(() => {
-        handleDbDisconnect()
-        handleListDbCreds()
-      })
-      .catch((error) => {
-        console.error("Error removing database connection:", error)
-      })
+  async function handleDbCredsRemove(creds: DBCreds) {
+    try {
+      await invokeDbDeletion(creds)
+      await handleDbDisconnect()
+      await handleListDbCreds()
+    } catch (error) {
+      console.error("Error removing database connection:", error)
+    }
   }
 
   async function handleNewDbConnection() {
@@ -212,7 +205,7 @@ export default function ConnectionSelector({
 
       if (!res) throw new Error("Connection failed")
 
-      handleListDbCreds()
+      await handleListDbCreds()
       updateDb(res)
 
       setTimeout(() => {
@@ -571,38 +564,38 @@ const DIALECTS: {
   icon: string
   className?: string
 }[] = [
-  {
-    value: "MYSQL",
-    label: "MYSQL",
-    icon: "skill-icons:mysql-light",
-  },
-  {
-    value: "POSTGRESQL",
-    label: "POSTGRESQL",
-    icon: "logos:postgresql",
-  },
-  {
-    value: "MSSQL",
-    label: "MSSQL (Experimental)",
-    icon: "streamline-ultimate-color:microsoft-logo",
-  },
-  {
-    value: "ORACLE",
-    label: "ORACLE (Experimental)",
-    icon: "cib:oracle",
-    className: "text-red-500",
-  },
-  {
-    value: "MARIADB",
-    label: "MARIADB (Experimental)",
-    icon: "logos:mariadb-icon",
-  },
-  {
-    value: "FIREBIRD",
-    label: "FIREBIRD (Experimental)",
-    icon: "devicon:firebird",
-  },
-]
+    {
+      value: "MYSQL",
+      label: "MYSQL",
+      icon: "skill-icons:mysql-light",
+    },
+    {
+      value: "POSTGRESQL",
+      label: "POSTGRESQL",
+      icon: "logos:postgresql",
+    },
+    {
+      value: "MSSQL",
+      label: "MSSQL (Experimental)",
+      icon: "streamline-ultimate-color:microsoft-logo",
+    },
+    {
+      value: "ORACLE",
+      label: "ORACLE (Experimental)",
+      icon: "cib:oracle",
+      className: "text-red-500",
+    },
+    {
+      value: "MARIADB",
+      label: "MARIADB (Experimental)",
+      icon: "logos:mariadb-icon",
+    },
+    {
+      value: "FIREBIRD",
+      label: "FIREBIRD (Experimental)",
+      icon: "devicon:firebird",
+    },
+  ]
 
 function DialectDropdown({
   value,

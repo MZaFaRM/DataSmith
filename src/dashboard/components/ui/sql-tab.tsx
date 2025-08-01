@@ -61,7 +61,7 @@ export default function SqlInsertionTab({
       let output: string[] = []
 
       if (rawQuery.trim() !== "") {
-        console.log("query:", rawQuery.trim())
+        // console.log("query:", rawQuery.trim())
         output = await runSql(rawQuery.trim())
       }
 
@@ -107,7 +107,7 @@ export default function SqlInsertionTab({
       setLoading(true)
       const resLog = await invokeRunSql(query)
       onSuccess()
-      console.log("SQL Execution Result:", resLog)
+      // console.log("SQL Execution Result:", resLog)
       return resLog
     } catch (error: any) {
       console.error("Error executing SQL:", error)

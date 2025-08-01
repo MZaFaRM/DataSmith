@@ -54,6 +54,7 @@ export default function RenderPreview({
   const [showCheck, setShowCheck] = useState<boolean>(false)
   const [tablePacket, setTablePacket] = useState<TablePacket | null>(null)
   const [needsRefresh, setNeedsRefresh] = useState<boolean>(true)
+  const [previewLoading, setPreviewLoading] = useState<boolean>(false)
   const [loading, setLoading] = useState<boolean>(false)
   const [pendingJobId, setPendingJobId] = useState<string | null>(null)
   const [page, setPage] = useState<number>(0)
@@ -120,16 +121,16 @@ export default function RenderPreview({
 
   useEffect(() => {
     if (!pendingJobId) return
-    setLoading(true)
+    setPreviewLoading(true)
     const startTime = Date.now()
     const interval = setInterval(() => {
       invokeGetGenResult(pendingJobId)
         .then((result) => {
           if (result.status === "done" && result.data) {
-            console.log("Received generation result:", result)
+            // console.log("Received generation result:", result)
             setTablePacket(result.data)
             clearInterval(interval)
-            setLoading(false)
+            setPreviewLoading(false)
             setPendingJobId(null)
             setProgress(null)
             return
@@ -146,7 +147,7 @@ export default function RenderPreview({
         })
         .catch((error) => {
           console.error("Error fetching generation result:", error)
-          setLoading(false)
+          setPreviewLoading(false)
           clearInterval(interval)
           setPendingJobId(null)
         })
@@ -199,7 +200,7 @@ export default function RenderPreview({
           variant: "destructive",
           title: "Error inserting data",
           description: err.message
-            ? err.message.slice(0, 250) + "\nCheck Log for more details."
+            ? err.message.slice(0, 250)
             : "Unknown error occurred",
         })
       })
@@ -212,7 +213,7 @@ export default function RenderPreview({
     try {
       invokeClearGenPackets()
     } catch (error) {
-      console.log("Error", error)
+      console.error("Error clearing packets", error)
     }
   }
 
@@ -234,7 +235,7 @@ export default function RenderPreview({
       setPendingJobId(res.jobId)
       setProgress(res)
       setNeedsRefresh(false)
-      console.log("Generation started with job ID:", res.jobId)
+      // console.log("Generation started with job ID:", res.jobId)
     } catch (error) {
       console.error("Error verifying spec:", error)
     }
@@ -274,7 +275,7 @@ export default function RenderPreview({
 
   async function getNewPacket(page: number | string, packetId: string) {
     if (!tablePacket) return
-    setLoading(true)
+    setPreviewLoading(true)
     try {
       let value = Number(page)
       if (value < 0) {
@@ -284,7 +285,7 @@ export default function RenderPreview({
       }
       setPage(value)
       const newPacket = await invokeGetGenPacket(packetId, value)
-      console.log("New packet page:", newPacket.page)
+      // console.log("New packet page:", newPacket.page)
       setTablePacket(newPacket)
     } catch (error) {
       toast({
@@ -293,7 +294,7 @@ export default function RenderPreview({
         description: (error as Error).message || "Unknown error occurred",
       })
     } finally {
-      setLoading(false)
+      setPreviewLoading(false)
     }
   }
 
@@ -301,40 +302,43 @@ export default function RenderPreview({
     <div
       className={cn(
         "flex h-full flex-col overflow-auto",
-        loading && "cursor-wait"
+        previewLoading && "cursor-wait"
       )}
     >
       <div
         className={cn(
           "bg-current-foreground flex h-full flex-col items-center justify-center rounded-md bg-gradient-to-br text-gray-800",
-          !loading && "hidden"
+          !previewLoading && "hidden"
         )}
       >
         <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-purple-500 border-t-transparent" />
         <p className="text-base font-medium tracking-wide text-foreground">
-          Generating preview...
+          {previewLoading ? "Generating preview..." : loading && "Processing your request..."}
         </p>
         <p className="mt-1 text-sm font-medium text-muted-foreground">
           Hang tight. This may take a while.
         </p>
-        <div className="w-full max-w-lg">
-          <div className="mt-4 flex w-full justify-between space-x-2 text-foreground">
-            <p className="text-sm font-semibold">{progress?.status + "..."}</p>
-            <p className="text-sm font-semibold text-muted-foreground">
-              {progress?.column}
+        {previewLoading &&
+          <div className="w-full max-w-lg">
+            <div className="mt-4 flex w-full justify-between space-x-2 text-foreground">
+              <p className="text-sm font-semibold">{progress?.status + "..."}</p>
+              <p className="text-sm font-semibold text-muted-foreground">
+                {progress?.column}
+              </p>
+            </div>
+
+            <div className="mt-4 w-full max-w-lg">
+              <Progress
+                value={((progress?.row ?? 0) / (progress?.total ?? 1)) * 100}
+              />
+            </div>
+            <p className="font-regular mt-2 w-full text-center text-sm text-muted-foreground">
+              {progress?.eta ? progress.eta : "Calculating ETA..."}
             </p>
           </div>
-          <div className="mt-4 w-full max-w-lg">
-            <Progress
-              value={((progress?.row ?? 0) / (progress?.total ?? 1)) * 100}
-            />
-          </div>
-          <p className="font-regular mt-2 w-full text-center text-sm text-muted-foreground">
-            {progress?.eta ? progress.eta : "Calculating ETA..."}
-          </p>
-        </div>
+        }
       </div>
-      <div className={cn("flex-1 overflow-auto", loading && "hidden")}>
+      <div className={cn("flex-1 overflow-auto", previewLoading && "hidden")}>
         <Table key={tableSpec?.name || "unknown"}>
           <TableHeader>
             {tablePacket && (tablePacket?.columns?.length ?? 0) > 0 ? (
@@ -411,15 +415,15 @@ export default function RenderPreview({
         {(tablePacket?.entries.length ?? 0) == 0 && (
           <div className="flex h-3/4 items-center justify-center text-muted-foreground">
             <p className="text-sm font-medium">
-              Configure column specifications from <span className="bg-muted p-1 rounded border">Insert tab</span>
-              {" "}and click on <span className="bg-muted p-1 rounded border">Generate</span> to preview data.
+              Configure column specifications from <span className="bg-muted p-1 rounded border">Insert</span> tab
+              and click on <span className="bg-muted p-1 rounded border">Generate</span> to preview data.
             </p>
           </div>
         )}
       </div>
       <div className="sticky bottom-0 mt-auto flex items-center justify-center bg-muted p-2">
         <div>
-          {loading ? (
+          {previewLoading ? (
             <button
               onClick={handleClearGenPackets}
               className={cn(
@@ -541,11 +545,11 @@ export default function RenderPreview({
             <div className="inline-flex overflow-hidden rounded-md border bg-purple-500 text-white">
               <button
                 onClick={handleInsertPacket}
-                disabled={!tablePacket || loading}
+                disabled={!tablePacket || previewLoading || loading}
                 className={cn(
                   "flex w-[145px] items-center px-3 py-2",
                   "text-sm font-medium hover:bg-purple-600",
-                  loading && "cursor-wait opacity-50",
+                  previewLoading && "cursor-wait opacity-50",
                   !tablePacket && "cursor-not-allowed opacity-50"
                 )}
               >
@@ -567,7 +571,7 @@ export default function RenderPreview({
                 >
                   <DropdownMenuItem
                     onSelect={handleSaveToFile}
-                    disabled={!tablePacket || loading}
+                    disabled={!tablePacket || previewLoading}
                   >
                     <Icon icon="mdi:file-export" className="mr-4 h-4 w-4" />
                     Export SQL
