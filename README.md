@@ -94,3 +94,4 @@ Boot up the application, connect to a database, and easily start generating and 
 ---
 
 Drop a ⭐  if you liked this project. 
+
