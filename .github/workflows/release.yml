@@ -14,9 +14,6 @@ jobs:
       release_id: ${{ steps.create-release.outputs.result }}
 
     steps:
-      - name: Hello World
-        run: echo "Hello World 🚀"
-
       - name: Checkout repository
         uses: actions/checkout@v3
 
