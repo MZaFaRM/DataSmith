@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import {
   invokeClearGenPackets,
   invokeExportSqlPacket,
@@ -35,6 +35,7 @@ import {
   TableSpec,
   TableSpecEntry,
 } from "@/components/types"
+import { clear } from "console"
 
 interface RenderPreviewProps {
   tableSpec: TableSpecEntry | null
@@ -59,9 +60,7 @@ export default function RenderPreview({
   const [pendingJobId, setPendingJobId] = useState<string | null>(null)
   const [page, setPage] = useState<number>(0)
   const [progress, setProgress] = useState<PacketProgress | null>(null)
-  const [noOfRowsInput, setNoOfRowsInput] = useState<number | null>(
-    noOfRows || 1
-  )
+  const [noOfRowsInput, setNoOfRowsInput] = useState<number | null>(noOfRows || 1)
 
   useEffect(() => {
     setNeedsRefresh(true)
@@ -122,25 +121,23 @@ export default function RenderPreview({
   useEffect(() => {
     if (!pendingJobId) return
     setPreviewLoading(true)
-    const startTime = Date.now()
+
     const interval = setInterval(() => {
       invokeGetGenResult(pendingJobId)
         .then((result) => {
           if (result.status === "done" && result.data) {
-            // console.log("Received generation result:", result)
             setTablePacket(result.data)
             clearInterval(interval)
             setPreviewLoading(false)
             setPendingJobId(null)
             setProgress(null)
-            return
+            clearSamples()
           } else {
             setProgress({
               ...result.progress,
               eta: calculateEta(
                 result.progress.row,
-                result.progress.total,
-                startTime
+                result.progress.total
               ),
             })
           }
@@ -150,38 +147,74 @@ export default function RenderPreview({
           setPreviewLoading(false)
           clearInterval(interval)
           setPendingJobId(null)
+          clearSamples()
         })
     }, 500)
 
     return () => clearInterval(interval)
   }, [pendingJobId])
 
-  function calculateEta(
-    row: number,
-    total: number,
-    startTime: number
-  ): string | null {
-    if (!total || total <= 0) return null
+  type Sample = {
+    row: number
+    time: number
+  }
 
-    const elapsed = Date.now() - startTime
-    const progress = row / total
+  const samples = useRef<Sample[]>([])
+  const worstRate = useRef<number | null>(null)
 
-    if (progress > 0) {
-      const estimatedTotal = elapsed / progress
-      const etaMs = estimatedTotal - elapsed
-      const seconds = Math.max(0, Math.floor(etaMs / 1000))
-      const mins = Math.floor(seconds / 60)
-      const secs = seconds % 60
+  function clearSamples() {
+    samples.current = []
+    worstRate.current = null
+  }
 
-      if (mins > 0) {
-        return `${mins} minute${mins !== 1 ? "s" : ""} ${secs} second${secs !== 1 ? "s" : ""} remaining`
-      } else {
-        return `${secs} second${secs !== 1 ? "s" : ""} remaining`
+  function calculateEta(row: number, total: number): string | null {
+    const now = Date.now()
+    if (!total || row <= 0 || row >= total) {
+      samples.current = [{ row, time: now }]
+      worstRate.current = null
+      return null
+    }
+
+    samples.current.push({ row, time: now })
+    if (samples.current.length > 20) samples.current.shift()
+
+    const rates: number[] = []
+    for (let i = 1; i < samples.current.length; i++) {
+      const deltaR = samples.current[i].row - samples.current[i - 1].row
+      const deltaT = samples.current[i].time - samples.current[i - 1].time
+      if (deltaR > 0 && deltaT > 0) {
+        rates.push(deltaT / deltaR)
       }
     }
 
-    return null
+    if (rates.length < 3) return null
+
+    const avg = rates.reduce((a, b) => a + b, 0) / rates.length
+    const slowest = Math.max(...rates)
+    worstRate.current = worstRate.current
+      ? Math.max(worstRate.current, slowest)
+      : slowest
+
+    // Confidence increases as more rows processed
+    const confidence = Math.min(Math.pow(row / total, 1.9), 0.8)
+    const exaggeratedWorst = worstRate.current! * 1.9
+
+    // Start harsh, then blend towards avg
+    const blendedRate =
+      (1 - confidence) * exaggeratedWorst + confidence * avg
+
+    const remaining = total - row
+    const etaMs = blendedRate * remaining
+    const seconds = Math.floor(etaMs / 1000)
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+
+    return mins > 0
+      ? `${mins} minute${mins !== 1 ? "s" : ""} ${secs} second${secs !== 1 ? "s" : ""} remaining`
+      : `${secs} second${secs !== 1 ? "s" : ""} remaining`
   }
+
+
 
   function handleInsertPacket() {
     if (!tablePacket) return
@@ -211,6 +244,7 @@ export default function RenderPreview({
 
   async function handleClearGenPackets() {
     try {
+      clearSamples()
       invokeClearGenPackets()
     } catch (error) {
       console.error("Error clearing packets", error)
@@ -302,13 +336,13 @@ export default function RenderPreview({
     <div
       className={cn(
         "flex h-full flex-col overflow-auto",
-        previewLoading && "cursor-wait"
+        (previewLoading || loading) && "cursor-wait"
       )}
     >
       <div
         className={cn(
           "bg-current-foreground flex h-full flex-col items-center justify-center rounded-md bg-gradient-to-br text-gray-800",
-          !previewLoading && "hidden"
+          !previewLoading && !loading && "hidden"
         )}
       >
         <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-purple-500 border-t-transparent" />
@@ -316,7 +350,7 @@ export default function RenderPreview({
           {previewLoading ? "Generating preview..." : loading && "Processing your request..."}
         </p>
         <p className="mt-1 text-sm font-medium text-muted-foreground">
-          Hang tight. This may take a while.
+          {previewLoading ? "Hang tight. This may take a while." : loading && "Hang tight. This may take a few seconds."}
         </p>
         {previewLoading &&
           <div className="w-full max-w-lg">
