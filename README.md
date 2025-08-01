@@ -1,4 +1,11 @@
+
 ![banner.png](./banner.png)
+
+<div align="center">
+  <img src="./app-icon.png" width="100px" />
+  <h1>DataSmith</h1>
+</div>
+
 
 <p align="center">
   <img src="https://img.shields.io/badge/mysql-4479A1.svg?style=for-the-badge&logo=mysql&logoColor=white"/>
@@ -7,11 +14,6 @@
   <img src="https://img.shields.io/badge/Microsoft%20SQL%20Server-CC2927?style=for-the-badge&logo=microsoft%20sql%20server&logoColor=white"/>
   <img src="https://img.shields.io/badge/firebase-a08021?style=for-the-badge&logo=firebase&logoColor=ffcd34"/>
 </p>
-
-<div align="center">
-  <img src="./app-icon.png" width="100px" />
-  <h1>DataSmith</h1>
-</div>
 
 ![BuyMeACoffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)
 
@@ -32,9 +34,11 @@ I'd love to hear any feedback or suggestions!
 
 ## Setup & Installation
 
-### Easiest Way
+### Installers
 
-Download the latest release from the [📦 Releases](https://github.com/MZaFaRM/DataSmith/releases) page.
+* Windows installer: [NSIS](https://github.com/MZaFaRM/DataSmith/releases/latest/download/DataSmith_1.9.0_x64-setup.exe) / [.msi](https://github.com/MZaFaRM/DataSmith/releases/latest/download/DataSmith_1.9.0_x64_en-US.msi).
+* Linux builds: [.AppImage](https://github.com/MZaFaRM/DataSmith/releases/latest/download/DataSmith_1.9.0_amd64.AppImage) / [.deb](https://github.com/MZaFaRM/DataSmith/releases/latest/download/DataSmith_1.9.0_amd64.deb) / [.rpm](https://github.com/MZaFaRM/DataSmith/releases/latest/download/DataSmith-1.9.0-1.x86_64.rpm).
+* Mac builds: [aarch64 `.dmg`](https://github.com/MZaFaRM/DataSmith/releases/latest/download/DataSmith_1.9.0_aarch64.dmg) / [aarch64 `.app.tar.gz`](https://github.com/MZaFaRM/DataSmith/releases/latest/download/DataSmith_aarch64.app.tar.gz).
 
 ### Developer Setup
 
@@ -54,14 +58,14 @@ If you’d like to build it yourself or contribute, follow the instructions belo
 
 ### Steps
 
-1. **Clone the repository**
+1. Clone the repository
 
    ```bash
    git clone https://github.com/MZaFaRM/DataSmith.git
    cd DataSmith
    ```
 
-2. **Set up Python backend**
+2. Set up Python backend
 
    ```bash
    python -m venv venv
@@ -70,7 +74,7 @@ If you’d like to build it yourself or contribute, follow the instructions belo
    python build.py
    ```
 
-3. **Set up the frontend**
+3. Set up the frontend
 
    ```bash
    pnpm install
@@ -78,6 +82,8 @@ If you’d like to build it yourself or contribute, follow the instructions belo
    ```
 
 4. **Done!**
+
+> Refer to the [Tauri documentation on signing updates](https://v2.tauri.app/plugin/updater/#signing-updates) to resolve signature-related issues during `pnpm tauri build`.
 
 ## 🚀 Usage
 
@@ -87,7 +93,4 @@ Boot up the application, connect to a database, and easily start generating and 
 
 ---
 
-
-<div align="right">
-  Drop a ⭐  if you liked this project. 
-</div>
+Drop a ⭐  if you liked this project. 
