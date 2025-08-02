@@ -53,7 +53,6 @@ fn main() {
                 let reader = BufReader::new(stdout);
                 for line in reader.lines() {
                     if let Ok(line) = line {
-                        // ADD THIS
                         let parsed: serde_json::Value =
                             serde_json::from_str(&line).unwrap_or_default();
 
