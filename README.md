@@ -89,9 +89,10 @@ If you’d like to build it yourself or contribute, follow the instructions belo
 
 Boot up the application, connect to a database, and easily start generating and inserting custom data.
 
-![banner](https://github.com/user-attachments/assets/c3a20074-a519-4b2e-8119-8f6ad1bf4968)
+![banner](./banner.gif)
 
 ---
 
 Drop a ⭐  if you liked this project. 
+
 
