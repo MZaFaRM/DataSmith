@@ -8,7 +8,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote_plus
-from sqlalchemy import event
+from sqlalchemy import event, func, literal, table, union_all
 
 import networkx as nx
 from networkx import Graph
@@ -268,14 +268,26 @@ class DatabaseFactory:
         tables = self.inspector.get_table_names()
         table_info = {table: {"parents": 0, "rows": 0} for table in tables}
 
-        for table in table_info:
-            fks = self.inspector.get_foreign_keys(table)
-            parents = {fk["referred_table"] for fk in fks if fk.get("referred_table")}
-            table_info[table]["parents"] = len(parents)
+        with self.engine.connect() as conn:
+            metadata = MetaData()
 
-            with self.engine.connect() as conn:
-                result = conn.execute(sql_text(f"SELECT COUNT(*) FROM {table}"))
-                table_info[table]["rows"] = result.scalar_one()
+            for table in table_info:
+                # Count foreign key parents
+                fks = self.inspector.get_foreign_keys(table)
+                parents = {
+                    fk["referred_table"] for fk in fks if fk.get("referred_table")
+                }
+                table_info[table]["parents"] = len(parents)
+
+                # Reflect table
+                table_obj = Table(table, metadata, autoload_with=conn)
+
+                # Build portable COUNT(*) query
+                stmt = select(func.count()).select_from(table_obj)
+
+                # Execute safely
+                row_count = conn.execute(stmt).scalar_one()
+                table_info[table]["rows"] = row_count
 
         return table_info
 
@@ -333,16 +345,21 @@ class DatabaseFactory:
 
     def get_database_rows(self) -> list[dict]:
         tables = self.inspector.get_table_names()
-        rows = {}
-
-        query_parts = [
-            f"SELECT '{table}' AS name, COUNT(*) AS total FROM {table}"
-            for table in tables
-        ]
-        query = " UNION ALL ".join(query_parts)
+        metadata = MetaData()
+        queries = []
 
         with self.engine.connect() as conn:
-            result = conn.execute(sql_text(query)).fetchall()
+            for table in tables:
+                table_obj = Table(table, metadata, autoload_with=conn)
+                stmt = select(
+                    literal(table).label("name"), func.count().label("total")
+                ).select_from(table_obj)
+                queries.append(stmt)
+
+            # Combine into UNION ALL
+            union_stmt = union_all(*queries)
+
+            result = conn.execute(union_stmt).fetchall()
             rows = {
                 row.name: {
                     "table_name": row.name,
@@ -352,9 +369,11 @@ class DatabaseFactory:
                 for row in result
             }
 
-        new_rows = self.registry.get_usage_stats(self.id)
-        for row in new_rows:
-            rows[row.table_name]["new_rows"] = row.new_rows
+            # Merge in "new rows" from registry
+            new_rows = self.registry.get_usage_stats(self.id)
+            for row in new_rows:
+                if row.table_name in rows:  # avoid KeyError
+                    rows[row.table_name]["new_rows"] = row.new_rows
 
         return list(rows.values())
 

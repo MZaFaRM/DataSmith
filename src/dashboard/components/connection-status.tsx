@@ -47,6 +47,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import { toast } from "@/components/ui/use-toast"
 import { Icons } from "@/components/icons"
 import { DBCreds, DBDialectType } from "@/components/types"
 
@@ -62,13 +63,13 @@ export default function ConnectionSelector({
   const [showDialog, setShowDialog] = useState(false)
   const [open, setOpen] = useState(false)
   const [newDbCreds, setNewDbCreds] = useState<DBCreds | null>(null)
-  const [dbConnecting, setDbConnecting] = useState(false)
+  const [loading, setLoading] = useState(false)
   const [errorField, setErrorField] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [dbList, setDbList] = useState<DBCreds[]>([])
 
   useEffect(() => {
-    (async () => {
+    ;(async () => {
       await handleListDbCreds()
       await handleSavedDbCreds()
       await handleLastConnected()
@@ -86,6 +87,11 @@ export default function ConnectionSelector({
       }
     } catch (error) {
       console.error("Error fetching last connected database:", error)
+      toast({
+        title: "Auto reconnect failed",
+        description: (error as Error).message,
+        variant: "destructive",
+      })
     }
   }
 
@@ -112,7 +118,7 @@ export default function ConnectionSelector({
   }
 
   async function handleSavedDbCreds() {
-    setDbConnecting(true)
+    setLoading(true)
     try {
       const payload = await invokeDbInfo()
       if (payload && payload.id) {
@@ -122,7 +128,7 @@ export default function ConnectionSelector({
     } catch (error) {
       console.error("Error fetching database info:", error)
     } finally {
-      setDbConnecting(false)
+      setLoading(false)
     }
   }
 
@@ -137,13 +143,13 @@ export default function ConnectionSelector({
   }
 
   async function handleRefresh() {
-    setDbConnecting(true)
+    setLoading(true)
     try {
       await handleDbCredsSelect(dbCreds!)
     } catch (error) {
       console.error("Error refreshing database info:", error)
     } finally {
-      setDbConnecting(false)
+      setLoading(false)
     }
   }
 
@@ -157,7 +163,7 @@ export default function ConnectionSelector({
   }
 
   async function handleDbCredsSelect(creds: DBCreds) {
-    setDbConnecting(true)
+    setLoading(true)
     updateDb({ ...creds, id: undefined })
     // console.log(creds)
     try {
@@ -167,8 +173,13 @@ export default function ConnectionSelector({
       setNewDbCreds(null)
     } catch (error) {
       console.error("Error reconnecting to the database:", error)
+      toast({
+        title: `Reconnect to database \`${creds.name}\` failed`,
+        description: (error as Error).message,
+        variant: "destructive",
+      })
     } finally {
-      setDbConnecting(false)
+      setLoading(false)
       await handleSavedDbCreds()
     }
   }
@@ -186,7 +197,7 @@ export default function ConnectionSelector({
   async function handleNewDbConnection() {
     if (!newDbCreds) return
 
-    setDbConnecting(true)
+    setLoading(true)
 
     try {
       if (!newDbCreds.dialect) {
@@ -229,17 +240,26 @@ export default function ConnectionSelector({
         }))
       }, 3000)
     } finally {
-      setDbConnecting(false)
+      setLoading(false)
     }
   }
 
   return (
     <div className="relative">
-      {dbConnecting && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center rounded bg-muted">
+      {loading && (
+        <div
+          className={cn(
+            "group absolute inset-0 z-10 flex items-center justify-center rounded",
+            "bg-muted px-5 text-muted-foreground hover:bg-red-500 hover:text-white"
+          )}
+          onClick={() => {
+            setLoading(false)
+            handleDbDisconnect()
+          }}
+        >
           <Icon
             icon="fontisto:spinner-fidget"
-            className="h-4 w-4 animate-spin text-muted-foreground"
+            className="mr-5 h-4 w-4 animate-spin"
           />
         </div>
       )}
@@ -251,11 +271,11 @@ export default function ConnectionSelector({
               variant="outline"
               role="combobox"
               aria-expanded={open}
-              className={cn("w-[200px]", dbConnecting && "cursor-wait")}
+              className={cn("w-[200px]", loading && "cursor-wait")}
             >
               {dbCreds?.name ? (
                 <>
-                  <div className={cn(dbConnecting && "cursor-wait")}>
+                  <div className={cn(loading && "cursor-wait")}>
                     <Icon
                       icon="ix:circle-dot"
                       className={cn(
@@ -293,20 +313,17 @@ export default function ConnectionSelector({
               <CommandEmpty>No DB found.</CommandEmpty>
               <CommandSeparator />
               <CommandGroup heading="Actions">
-                <CommandItem onSelect={handleRefresh} disabled={dbConnecting}>
+                <CommandItem onSelect={handleRefresh} disabled={loading}>
                   <Icon
                     icon="mdi:refresh"
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      dbConnecting && "animate-spin"
-                    )}
+                    className={cn("mr-2 h-4 w-4", loading && "animate-spin")}
                   />
                   Refresh
                 </CommandItem>
                 {dbCreds?.name && (
                   <>
                     <CommandItem
-                      onSelect={() => !dbConnecting && handleDbDisconnect()}
+                      onSelect={() => !loading && handleDbDisconnect()}
                     >
                       <Icon
                         icon="mdi:power"
@@ -316,9 +333,7 @@ export default function ConnectionSelector({
                     </CommandItem>
 
                     <CommandItem
-                      onSelect={() =>
-                        !dbConnecting && handleDbCredsRemove(dbCreds)
-                      }
+                      onSelect={() => !loading && handleDbCredsRemove(dbCreds)}
                     >
                       <Icon
                         icon="solar:database-bold-duotone"
@@ -334,8 +349,8 @@ export default function ConnectionSelector({
                 {dbList.map((conn) => (
                   <CommandItem
                     key={conn.name}
-                    className={cn(dbConnecting && "cursor-wait")}
-                    disabled={dbConnecting}
+                    className={cn(loading && "cursor-wait")}
+                    disabled={loading}
                     onSelect={() => {
                       handleDbCredsSelect(conn)
                     }}
@@ -535,7 +550,7 @@ export default function ConnectionSelector({
                 "min-w-[100px] " +
                 (newDbCreds?.id
                   ? " cursor-not-allowed bg-green-600 text-white hover:bg-green-600"
-                  : dbConnecting
+                  : loading
                     ? "cursor-not-allowed"
                     : "hover:bg-accent")
               }
@@ -545,7 +560,7 @@ export default function ConnectionSelector({
             >
               {newDbCreds?.id ? (
                 "Connected!"
-              ) : dbConnecting ? (
+              ) : loading ? (
                 <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 "Connect"
@@ -564,38 +579,38 @@ const DIALECTS: {
   icon: string
   className?: string
 }[] = [
-    {
-      value: "MYSQL",
-      label: "MYSQL",
-      icon: "skill-icons:mysql-light",
-    },
-    {
-      value: "POSTGRESQL",
-      label: "POSTGRESQL",
-      icon: "logos:postgresql",
-    },
-    {
-      value: "MSSQL",
-      label: "MSSQL (Experimental)",
-      icon: "streamline-ultimate-color:microsoft-logo",
-    },
-    {
-      value: "ORACLE",
-      label: "ORACLE (Experimental)",
-      icon: "cib:oracle",
-      className: "text-red-500",
-    },
-    {
-      value: "MARIADB",
-      label: "MARIADB (Experimental)",
-      icon: "logos:mariadb-icon",
-    },
-    {
-      value: "FIREBIRD",
-      label: "FIREBIRD (Experimental)",
-      icon: "devicon:firebird",
-    },
-  ]
+  {
+    value: "MYSQL",
+    label: "MYSQL",
+    icon: "skill-icons:mysql-light",
+  },
+  {
+    value: "POSTGRESQL",
+    label: "POSTGRESQL",
+    icon: "logos:postgresql",
+  },
+  {
+    value: "MSSQL",
+    label: "MSSQL (Experimental)",
+    icon: "streamline-ultimate-color:microsoft-logo",
+  },
+  {
+    value: "ORACLE",
+    label: "ORACLE (Experimental)",
+    icon: "cib:oracle",
+    className: "text-red-500",
+  },
+  {
+    value: "MARIADB",
+    label: "MARIADB (Experimental)",
+    icon: "logos:mariadb-icon",
+  },
+  {
+    value: "FIREBIRD",
+    label: "FIREBIRD (Experimental)",
+    icon: "devicon:firebird",
+  },
+]
 
 function DialectDropdown({
   value,
