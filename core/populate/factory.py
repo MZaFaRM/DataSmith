@@ -11,7 +11,7 @@ from urllib.parse import quote_plus
 from sqlalchemy import event, func, literal, table, union_all
 
 import networkx as nx
-from networkx import Graph
+from networkx import DiGraph, Graph
 from sqlalchemy import (
     Connection,
     MetaData,
@@ -333,7 +333,7 @@ class DatabaseFactory:
 
         return float("inf")
 
-    def get_dependency_graph(self, tables: list[str]) -> Graph:
+    def get_dependency_graph(self, tables: list[str]) -> DiGraph:
         graph = nx.DiGraph()
         for table in tables:
             for fk in self.inspector.get_foreign_keys(table):

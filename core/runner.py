@@ -32,6 +32,9 @@ class Runner:
                 print(res, flush=True)
                 break
 
+            _id: str | None = None
+            res: str = "{}"
+
             try:
                 req = json.loads(line)
                 req = Request(**req)
@@ -44,7 +47,8 @@ class Runner:
                 tb = traceback.format_exc()
                 res_obj = Response(status="error", error=str(e), traceback=tb).to_dict()
 
-                res_obj["id"] = _id
+                if _id is not None:
+                    res_obj["id"] = _id
                 res = json.dumps(res_obj)
             finally:
                 print(res, flush=True)
