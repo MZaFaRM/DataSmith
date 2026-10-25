@@ -102,6 +102,8 @@ class DbCredsSchema(BaseModel):
     user: str
     password: str = ""
     dialect: str
+    drivername: Optional[str] = None
+    url_query: Optional[str] = None
     last_connected: Optional[datetime] = None
 
     model_config = {"from_attributes": True}

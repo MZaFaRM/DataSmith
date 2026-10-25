@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 
 from core.settings import DB_PATH
@@ -19,7 +19,22 @@ class DBFRegistry:
     def __init__(self):
         self.engine = create_engine(f"sqlite:///{DB_PATH}", echo=False)
         Base.metadata.create_all(self.engine)
+        self._migrate_db_creds()
         self.session = sessionmaker(bind=self.engine)
+
+    def _migrate_db_creds(self):
+        columns = {
+            column["name"] for column in inspect(self.engine).get_columns("db_creds")
+        }
+        with self.engine.begin() as connection:
+            if "drivername" not in columns:
+                connection.execute(
+                    text("ALTER TABLE db_creds ADD COLUMN drivername VARCHAR")
+                )
+            if "url_query" not in columns:
+                connection.execute(
+                    text("ALTER TABLE db_creds ADD COLUMN url_query TEXT")
+                )
 
     def last_connected(self) -> Optional[DbCredsSchema]:
         with self.session() as session:
@@ -40,12 +55,27 @@ class DBFRegistry:
             return schema.id
 
     def exists(
-        self, name: str, host: str, port: str, user: str, dialect: str | DBDialectType
+        self,
+        name: str,
+        host: str,
+        port: str,
+        user: str,
+        dialect: str | DBDialectType,
+        drivername: str | None = None,
+        url_query: str | None = None,
     ) -> Optional[DbCredsSchema]:
         with self.session() as session:
             row = (
                 session.query(DbCredsModel)
-                .filter_by(name=name, host=host, port=port, user=user, dialect=dialect)
+                .filter_by(
+                    name=name,
+                    host=host,
+                    port=port,
+                    user=user,
+                    dialect=dialect,
+                    drivername=drivername,
+                    url_query=url_query,
+                )
                 .first()
             )
             if row:
@@ -64,6 +94,8 @@ class DBFRegistry:
                     DbCredsModel.port,
                     DbCredsModel.user,
                     DbCredsModel.dialect,
+                    DbCredsModel.drivername,
+                    DbCredsModel.url_query,
                 )
                 .tuples()
                 .all()

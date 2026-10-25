@@ -27,6 +27,8 @@ class DbCredsModel(Base):
     port = Column(String, nullable=False)
     user = Column(String, nullable=False)
     dialect = Column(Enum(DBDialectType), nullable=False)
+    drivername = Column(String, nullable=True)
+    url_query = Column(Text, nullable=True)
     _password = Column("password", String, nullable=False)
     last_connected = Column(DateTime, nullable=False, server_default=func.now(), onupdate=func.now())
 

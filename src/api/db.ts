@@ -19,9 +19,25 @@ export function invokeGetLastConnected() {
 }
 
 export function invokeDbConnection(dbCreds: DBCreds) {
-  return invokeCliRequest<DBCreds, DBCreds>({
+  return invokeCliRequest<Record<string, unknown>, DBCreds>({
     kind: "set_db_connect",
-    body: dbCreds,
+    body: {
+      host: dbCreds.host,
+      port: dbCreds.port,
+      user: dbCreds.user,
+      name: dbCreds.name,
+      password: dbCreds.password,
+      dialect: dbCreds.dialect,
+      drivername: dbCreds.drivername,
+      url_query: dbCreds.urlQuery,
+    },
+  })
+}
+
+export function invokeDbConnectionUrl(connectionUrl: string) {
+  return invokeCliRequest<{ connection_url: string }, DBCreds>({
+    kind: "set_db_connect_url",
+    body: { connection_url: connectionUrl },
   })
 }
 
@@ -41,9 +57,17 @@ export function invokeDbDeletion(dbCreds: DBCreds) {
 }
 
 export function invokeDbReconnection(dbCreds: DBCreds) {
-  return invokeCliRequest<DBCreds, DBCreds>({
+  return invokeCliRequest<Record<string, unknown>, DBCreds>({
     kind: "set_db_reconnect",
-    body: dbCreds,
+    body: {
+      host: dbCreds.host,
+      port: dbCreds.port,
+      user: dbCreds.user,
+      name: dbCreds.name,
+      dialect: dbCreds.dialect,
+      drivername: dbCreds.drivername,
+      url_query: dbCreds.urlQuery,
+    },
   })
 }
 

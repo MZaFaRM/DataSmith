@@ -1,4 +1,5 @@
 import binascii
+import json
 import logging
 import os
 import platform
@@ -7,7 +8,6 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote_plus
 from sqlalchemy import event, func, literal, table, union_all
 
 import networkx as nx
@@ -24,6 +24,7 @@ from sqlalchemy import (
 from sqlalchemy import text as sql_text
 from sqlalchemy.engine import Engine, Inspector
 from sqlalchemy.engine.reflection import Inspector
+from sqlalchemy.engine import URL, make_url
 
 from core.populate.config import DBFRegistry
 from core.settings import LOG_PATH
@@ -40,6 +41,8 @@ from core.utils.types import (
 )
 from core.utils.types import TableMetadata, TablePacket, UsageStatSchema
 
+CONNECT_TIMEOUT = 10  # seconds
+
 
 class DatabaseFactory:
     def __init__(self):
@@ -49,6 +52,8 @@ class DatabaseFactory:
         self.name = ""
         self.password = ""
         self.dialect = DBDialectType.UNKNOWN
+        self.drivername: str | None = None
+        self.url_query: str | None = None
         self.registry = DBFRegistry()
 
     def to_dict(self) -> dict:
@@ -58,6 +63,8 @@ class DatabaseFactory:
             "user": self.user,
             "port": str(self.port),
             "name": self.name,
+            "drivername": self.drivername,
+            "url_query": self.url_query,
         }
 
     def from_dict(self, data: dict):
@@ -73,6 +80,47 @@ class DatabaseFactory:
                 self.dialect = DBDialectType(data[key])
             else:
                 setattr(self, key, data[key])
+        self.drivername = data.get("drivername")
+        self.url_query = data.get("url_query")
+
+    def from_url(self, connection_url: str):
+        if getattr(self, "_id", None) is not None:
+            raise ValueError(
+                "Already connected to a database. Please create a new instance."
+            )
+
+        parsed = make_url(connection_url)
+        dialects = {
+            "postgresql": DBDialectType.POSTGRESQL,
+            "mysql": DBDialectType.MYSQL,
+            "mariadb": DBDialectType.MARIADB,
+            "mssql": DBDialectType.MSSQL,
+            "oracle": DBDialectType.ORACLE,
+            "firebird": DBDialectType.FIREBIRD,
+        }
+        dialect = dialects.get(parsed.get_backend_name())
+        if dialect is None:
+            raise ValueError(f"Unsupported database URL dialect: {parsed.get_backend_name()}")
+        if not all([parsed.host, parsed.username, parsed.database]):
+            raise ValueError("The database URL must include host, username, and database name.")
+
+        default_ports = {
+            DBDialectType.POSTGRESQL: 5432,
+            DBDialectType.MYSQL: 3306,
+            DBDialectType.MARIADB: 3306,
+            DBDialectType.MSSQL: 1433,
+            DBDialectType.ORACLE: 1521,
+            DBDialectType.FIREBIRD: 3050,
+        }
+        self.host = parsed.host
+        self.user = parsed.username
+        self.password = parsed.password or ""
+        self.port = str(parsed.port or default_ports[dialect])
+        self.name = parsed.database
+        self.dialect = dialect
+        self.drivername = parsed.drivername
+        self.url_query = json.dumps(dict(parsed.query))
+        self._url = connection_url
 
     def to_schema(self) -> DbCredsSchema:
         return DbCredsSchema(
@@ -83,6 +131,8 @@ class DatabaseFactory:
             user=self.user,
             password=self.password,
             dialect=self.dialect,
+            drivername=self.drivername,
+            url_query=self.url_query,
         )
 
     def from_schema(self, schema: DbCredsSchema) -> None:
@@ -91,7 +141,17 @@ class DatabaseFactory:
                 "Already connected to a database. Please create a new instance."
             )
 
-        for key in ["id", "host", "user", "port", "name", "password", "dialect"]:
+        for key in [
+            "id",
+            "host",
+            "user",
+            "port",
+            "name",
+            "password",
+            "dialect",
+            "drivername",
+            "url_query",
+        ]:
             if not hasattr(schema, key):
                 raise ValueError(f"Missing required key: {key}")
             elif key == "dialect":
@@ -105,7 +165,7 @@ class DatabaseFactory:
     @property
     def url(self) -> str:
         if not hasattr(self, "_url") or self._url == "":
-            if not all([self.user, self.password, self.host, self.port, self.name]):
+            if not all([self.user, self.host, self.port, self.name]):
                 raise MissingRequiredAttributeError(
                     "Required arguments for url: user, password, host, port and name not set."
                 )
@@ -113,13 +173,30 @@ class DatabaseFactory:
             if self.dialect not in DIALECT_URLS:
                 raise ValueError(f"Unsupported dialect: {self.dialect}")
 
-            self._url = DIALECT_URLS[self.dialect].format(
-                user=quote_plus(self.user),
-                password=quote_plus(self.password),
-                host=self.host,
-                port=self.port,
-                name=quote_plus(self.name),
+            # Templates contain {placeholders}; fill them so make_url can parse
+            # out the default drivername and query.
+            default_url = make_url(
+                DIALECT_URLS[self.dialect].format(
+                    user="user", password="", host="localhost", port=0, name="db"
+                )
             )
+            drivername = self.drivername or default_url.drivername
+            query = dict(default_url.query)
+            if self.url_query:
+                query.update(json.loads(self.url_query))
+            query = {
+                key: tuple(value) if isinstance(value, list) else value
+                for key, value in query.items()
+            }
+            self._url = URL.create(
+                drivername=drivername,
+                username=self.user,
+                password=self.password,
+                host=self.host,
+                port=int(self.port),
+                database=self.name,
+                query=query,
+            ).render_as_string(hide_password=False)
         return self._url
 
     @property
@@ -138,7 +215,16 @@ class DatabaseFactory:
     @property
     def engine(self) -> Engine:
         if not hasattr(self, "_engine") or self._engine is None:
-            self._engine = create_engine(self.url, echo=False)
+            url = make_url(self.url)
+            connect_args = {}
+            # Without a timeout an unreachable host blocks the runner (and every
+            # queued request) until the OS gives up on the TCP connect.
+            if (
+                url.get_backend_name() in ("postgresql", "mysql", "mariadb")
+                and "connect_timeout" not in url.query
+            ):
+                connect_args["connect_timeout"] = CONNECT_TIMEOUT
+            self._engine = create_engine(url, echo=False, connect_args=connect_args)
         return self._engine
 
     # @property
@@ -149,7 +235,27 @@ class DatabaseFactory:
 
     @property
     def inspector(self) -> Inspector:
-        return inspect(self.engine)
+        # Reused so reflection results are cached; every query costs a full
+        # round trip on remote databases.
+        if getattr(self, "_inspector", None) is None:
+            self._inspector = inspect(self.engine)
+        return self._inspector
+
+    @property
+    def schema(self) -> dict[str, dict[str, list]]:
+        """Foreign keys and columns of every table, reflected in bulk."""
+        if getattr(self, "_schema", None) is None:
+            fks = self.inspector.get_multi_foreign_keys()
+            cols = self.inspector.get_multi_columns()
+            self._schema = {
+                "foreign_keys": {name: value for (_, name), value in fks.items()},
+                "columns": {name: value for (_, name), value in cols.items()},
+            }
+        return self._schema
+
+    def clear_schema_cache(self):
+        self._inspector = None
+        self._schema = None
 
     @property
     def connection(self) -> Connection:
@@ -227,6 +333,8 @@ class DatabaseFactory:
                 dialect=self.dialect,
                 user=self.user,
                 password=self.password,
+                drivername=self.drivername,
+                url_query=self.url_query,
             )
         )
         self.id = pk
@@ -242,6 +350,7 @@ class DatabaseFactory:
         if hasattr(self, "_engine") and self._engine:
             self._engine.dispose()
             self._engine = None
+        self.clear_schema_cache()
         if hasattr(self, "_url") and self._url:
             self._url = ""
         if hasattr(self, "transaction") and self.transaction:
@@ -254,6 +363,8 @@ class DatabaseFactory:
         self.user = ""
         self.port = ""
         self.password = ""
+        self.drivername = None
+        self.url_query = None
         self.transaction = None
         self.uncommitted = 0
         self.registry.reset_usage_stats()
@@ -264,39 +375,40 @@ class DatabaseFactory:
         """
         return self.inspector.get_columns(table_name)
 
-    def get_tables(self) -> dict:
-        tables = self.inspector.get_table_names()
-        table_info = {table: {"parents": 0, "rows": 0} for table in tables}
-
+    def count_rows(self, tables: list[str]) -> dict[str, int]:
+        """Row count of each table, fetched in a single UNION ALL query."""
+        if not tables:
+            return {}
+        stmt = union_all(
+            *(
+                select(literal(name).label("name"), func.count().label("total"))
+                .select_from(table(name))
+                for name in tables
+            )
+        )
         with self.engine.connect() as conn:
-            metadata = MetaData()
+            return {row.name: row.total for row in conn.execute(stmt)}
 
-            for table in table_info:
-                # Count foreign key parents
-                fks = self.inspector.get_foreign_keys(table)
-                parents = {
-                    fk["referred_table"] for fk in fks if fk.get("referred_table")
-                }
-                table_info[table]["parents"] = len(parents)
+    def get_tables(self) -> dict:
+        fks_by_table = self.schema["foreign_keys"]
+        counts = self.count_rows(list(fks_by_table))
 
-                # Reflect table
-                table_obj = Table(table, metadata, autoload_with=conn)
-
-                # Build portable COUNT(*) query
-                stmt = select(func.count()).select_from(table_obj)
-
-                # Execute safely
-                row_count = conn.execute(stmt).scalar_one()
-                table_info[table]["rows"] = row_count
-
-        return table_info
+        return {
+            name: {
+                "parents": len(
+                    {fk["referred_table"] for fk in fks if fk.get("referred_table")}
+                ),
+                "rows": counts.get(name, 0),
+            }
+            for name, fks in fks_by_table.items()
+        }
 
     def sort_tables(self, tables: list[str] | None = None) -> list[str]:
         """
         Sorts the tables based on their foreign key dependencies.
         """
 
-        graph = self.get_dependency_graph(tables or self.inspector.get_table_names())
+        graph = self.get_dependency_graph(tables or list(self.schema["foreign_keys"]))
         for src, tgt in graph.edges():
             score = self.score_edge(src, tgt)
             graph[src][tgt]["score"] = score
@@ -314,8 +426,8 @@ class DatabaseFactory:
         return sorted_tables
 
     def score_edge(self, source: str, target: str) -> int | float:
-        fks = self.inspector.get_foreign_keys(target)
-        columns = self.inspector.get_columns(target)
+        fks = self.schema["foreign_keys"].get(target, [])
+        columns = self.schema["columns"].get(target, [])
 
         for fk in fks:
             if fk.get("referred_table") != source:
@@ -335,45 +447,30 @@ class DatabaseFactory:
 
     def get_dependency_graph(self, tables: list[str]) -> DiGraph:
         graph = nx.DiGraph()
-        for table in tables:
-            for fk in self.inspector.get_foreign_keys(table):
+        for name in tables:
+            for fk in self.schema["foreign_keys"].get(name, []):
                 referred = fk.get("referred_table")
                 if referred and referred in tables:
-                    graph.add_edge(referred, table)
-            graph.add_node(table)
+                    graph.add_edge(referred, name)
+            graph.add_node(name)
         return graph
 
     def get_database_rows(self) -> list[dict]:
-        tables = self.inspector.get_table_names()
-        metadata = MetaData()
-        queries = []
-
-        with self.engine.connect() as conn:
-            for table in tables:
-                table_obj = Table(table, metadata, autoload_with=conn)
-                stmt = select(
-                    literal(table).label("name"), func.count().label("total")
-                ).select_from(table_obj)
-                queries.append(stmt)
-
-            # Combine into UNION ALL
-            union_stmt = union_all(*queries)
-
-            result = conn.execute(union_stmt).fetchall()
-            rows = {
-                row.name: {
-                    "table_name": row.name,
-                    "total_rows": row.total,
-                    "new_rows": 0,
-                }
-                for row in result
+        counts = self.count_rows(list(self.schema["foreign_keys"]))
+        rows = {
+            name: {
+                "table_name": name,
+                "total_rows": total,
+                "new_rows": 0,
             }
+            for name, total in counts.items()
+        }
 
-            # Merge in "new rows" from registry
-            new_rows = self.registry.get_usage_stats(self.id)
-            for row in new_rows:
-                if row.table_name in rows:  # avoid KeyError
-                    rows[row.table_name]["new_rows"] = row.new_rows
+        # Merge in "new rows" from registry
+        new_rows = self.registry.get_usage_stats(self.id)
+        for row in new_rows:
+            if row.table_name in rows:  # avoid KeyError
+                rows[row.table_name]["new_rows"] = row.new_rows
 
         return list(rows.values())
 

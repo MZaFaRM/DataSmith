@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import {
   invokeDbConnection,
+  invokeDbConnectionUrl,
   invokeDbDeletion,
   invokeDbDisconnect,
   invokeDbInfo,
@@ -10,7 +11,6 @@ import {
 } from "@/api/db"
 import { Icon } from "@iconify/react"
 import { CaretSortIcon, CheckIcon } from "@radix-ui/react-icons"
-import { set } from "date-fns"
 import { Eye, EyeOff } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -50,6 +50,12 @@ import {
 import { toast } from "@/components/ui/use-toast"
 import { Icons } from "@/components/icons"
 import { DBCreds, DBDialectType } from "@/components/types"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
 
 interface ConnectionSelectorProps {
   dbCreds: DBCreds | null
@@ -66,6 +72,9 @@ export default function ConnectionSelector({
   const [loading, setLoading] = useState(false)
   const [errorField, setErrorField] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
+  const [connectionMode, setConnectionMode] = useState<"fields" | "url">("fields")
+  const [connectionUrl, setConnectionUrl] = useState("")
+  const [urlError, setUrlError] = useState("")
   const [dbList, setDbList] = useState<DBCreds[]>([])
 
   useEffect(() => {
@@ -194,25 +203,33 @@ export default function ConnectionSelector({
     }
   }
 
-  async function handleNewDbConnection() {
-    if (!newDbCreds) return
+  async function handleNewDbConnection(
+    credentials: DBCreds | null = newDbCreds,
+    source: "fields" | "url" = connectionMode
+  ) {
+    if (!credentials) return
 
     setLoading(true)
 
     try {
-      if (!newDbCreds.dialect) {
+      if (!credentials.dialect) {
         setErrorField("dialect")
         throw new Error("Please select a database dialect.")
       }
 
-      const res = await invokeDbConnection({
-        host: newDbCreds.host || "localhost",
-        port: newDbCreds.port || "3306",
-        user: newDbCreds.user ?? "root",
-        name: newDbCreds.name ?? "",
-        password: newDbCreds.password ?? "",
-        dialect: newDbCreds.dialect || "UNKNOWN",
-      })
+      const res =
+        source === "url" && credentials.connectionUrl
+          ? await invokeDbConnectionUrl(credentials.connectionUrl)
+          : await invokeDbConnection({
+              host: credentials.host || "localhost",
+              port: credentials.port || defaultPortFor(credentials.dialect),
+              user: credentials.user ?? "root",
+              name: credentials.name ?? "",
+              password: credentials.password ?? "",
+              dialect: credentials.dialect || "UNKNOWN",
+              drivername: credentials.drivername,
+              urlQuery: credentials.urlQuery,
+            })
 
       if (!res) throw new Error("Connection failed")
 
@@ -231,6 +248,7 @@ export default function ConnectionSelector({
         ...prev!,
         error: handleErrorField(errMsg),
       }))
+      if (source === "url") setUrlError(handleErrorField(errMsg))
 
       setTimeout(() => {
         setErrorField(null)
@@ -242,6 +260,20 @@ export default function ConnectionSelector({
     } finally {
       setLoading(false)
     }
+  }
+
+  async function handleDbUrlConnection() {
+    setUrlError("")
+    let credentials: DBCreds
+    try {
+      credentials = parseDatabaseUrl(connectionUrl)
+    } catch (error) {
+      setUrlError((error as Error).message)
+      return
+    }
+
+    setNewDbCreds(credentials)
+    await handleNewDbConnection(credentials, "url")
   }
 
   return (
@@ -405,12 +437,23 @@ export default function ConnectionSelector({
         </Popover>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Create a DB Connection</DialogTitle>
+            <DialogTitle>Connect to a Database</DialogTitle>
             <DialogDescription>
-              Fill the connection details to connect to a new database.
+              Enter connection details or paste a database URL.
             </DialogDescription>
           </DialogHeader>
-          <div>
+          <Tabs
+            value={connectionMode}
+            onValueChange={(value) => {
+              setConnectionMode(value as "fields" | "url")
+              setUrlError("")
+            }}
+          >
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="fields">Connection details</TabsTrigger>
+              <TabsTrigger value="url">Database URL</TabsTrigger>
+            </TabsList>
+            <TabsContent value="fields">
             <div className="space-y-4 py-2 pb-4">
               <div>
                 <DialectDropdown
@@ -532,9 +575,37 @@ export default function ConnectionSelector({
                 </div>
               </div>
             </div>
-          </div>
+            </TabsContent>
+            <TabsContent value="url">
+              <div className="space-y-4 py-2 pb-4">
+                <div className="space-y-2">
+                  <Label htmlFor="database-url">Connection URL</Label>
+                  <Input
+                    id="database-url"
+                    type="url"
+                    autoComplete="off"
+                    placeholder="postgresql://user:password@host:5432/database"
+                    value={connectionUrl}
+                    onChange={(event) => {
+                      setConnectionUrl(event.target.value)
+                      setUrlError("")
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") handleDbUrlConnection()
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Supports PostgreSQL, MySQL, MariaDB, SQL Server, Oracle, and Firebird URLs, including query options such as sslmode.
+                  </p>
+                  {urlError && (
+                    <p className="text-sm text-red-500">{urlError}</p>
+                  )}
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
           <div className="-mt-4 flex justify-center">
-            {newDbCreds?.error && (
+            {connectionMode === "fields" && newDbCreds?.error && (
               <p className="text-center text-sm text-red-500">
                 {newDbCreds.error}
               </p>
@@ -554,9 +625,12 @@ export default function ConnectionSelector({
                     ? "cursor-not-allowed"
                     : "hover:bg-accent")
               }
-              onClick={() => {
-                handleNewDbConnection()
-              }}
+              onClick={() =>
+                connectionMode === "url"
+                  ? handleDbUrlConnection()
+                  : handleNewDbConnection()
+              }
+              disabled={loading}
             >
               {newDbCreds?.id ? (
                 "Connected!"
@@ -571,6 +645,88 @@ export default function ConnectionSelector({
       </Dialog>
     </div>
   )
+}
+
+function defaultPortFor(dialect: DBDialectType): string {
+  const ports: Record<DBDialectType, string> = {
+    MYSQL: "3306",
+    MARIADB: "3306",
+    POSTGRESQL: "5432",
+    MSSQL: "1433",
+    ORACLE: "1521",
+    FIREBIRD: "3050",
+    UNKNOWN: "",
+  }
+  return ports[dialect]
+}
+
+function parseDatabaseUrl(value: string): DBCreds {
+  let url: URL
+  try {
+    url = new URL(value.trim())
+  } catch {
+    throw new Error("Enter a valid database URL.")
+  }
+
+  if (url.hash) {
+    throw new Error("Remove the URL fragment and try again.")
+  }
+
+  const scheme = url.protocol.slice(0, -1).toLowerCase()
+  const baseScheme = scheme.split("+")[0]
+  const dialectByScheme: Record<string, DBDialectType> = {
+    postgres: "POSTGRESQL",
+    postgresql: "POSTGRESQL",
+    mysql: "MYSQL",
+    mariadb: "MARIADB",
+    mssql: "MSSQL",
+    oracle: "ORACLE",
+    firebird: "FIREBIRD",
+  }
+  const dialect = dialectByScheme[baseScheme]
+  if (!dialect) {
+    throw new Error("This database URL scheme is not supported.")
+  }
+
+  const name = decodeURIComponent(url.pathname.replace(/^\//, ""))
+  if (!url.hostname || !url.username || !name) {
+    throw new Error(
+      "The URL must include a host, username, and database name."
+    )
+  }
+
+  const defaultDrivername: Record<DBDialectType, string> = {
+    MYSQL: "mysql+pymysql",
+    MARIADB: "mariadb+pymysql",
+    POSTGRESQL: "postgresql+psycopg2",
+    MSSQL: "mssql+pyodbc",
+    ORACLE: "oracle+cx_oracle",
+    FIREBIRD: "firebird+fdb",
+    UNKNOWN: "",
+  }
+  const query: Record<string, string | string[]> = {}
+  url.searchParams.forEach((value, key) => {
+    if (Object.prototype.hasOwnProperty.call(query, key)) {
+      const previous = query[key]
+      query[key] = Array.isArray(previous)
+        ? [...previous, value]
+        : [previous, value]
+    } else {
+      query[key] = value
+    }
+  })
+
+  return {
+    host: url.hostname,
+    port: url.port || defaultPortFor(dialect),
+    user: decodeURIComponent(url.username),
+    password: decodeURIComponent(url.password),
+    name,
+    dialect,
+    drivername: scheme.includes("+") ? scheme : defaultDrivername[dialect],
+    urlQuery: JSON.stringify(query),
+    connectionUrl: value.trim(),
+  }
 }
 
 const DIALECTS: {

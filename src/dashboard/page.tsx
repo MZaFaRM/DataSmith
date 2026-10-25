@@ -3,7 +3,6 @@ import { invokeGetRowsConfig } from "@/api/db"
 import ConnectionStatus from "@/dashboard/components/connection-status"
 import InsertionPanel from "@/dashboard/components/insertion-panel"
 import ListTables from "@/dashboard/components/list-tables"
-import { openUrl } from "@tauri-apps/plugin-opener"
 
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { DBCreds, UsageInfo } from "@/components/types"
@@ -32,18 +31,8 @@ export default function DashboardPage() {
               <div className="flex items-center">
                 <h2 className="text-lg font-semibold">Welcome to DataSmith!</h2>
               </div>
-              <p className="mt-3 text-sm text-muted-foreground">
-                If you like this project,{" "}
-                <a
-                  className="semi-bold cursor-pointer text-yellow-300 hover:underline"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    openUrl("https://github.com/MZaFaRM/DataSmith")
-                  }}
-                >
-                  a star on github
-                </a>{" "}
-                would mean a lot.
+              <p className="mt-2 text-sm text-muted-foreground">
+                Generate realistic sample data and preview it before inserting.
               </p>
             </div>
             <ConnectionStatus

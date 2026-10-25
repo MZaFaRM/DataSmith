@@ -89,7 +89,11 @@ class Runner:
         last_connected = self.dbf.registry.last_connected()
         if not last_connected:
             return self._ok(None)
+        elif getattr(self.dbf, "_id", None) == last_connected.id:
+            # Already connected, e.g. a duplicate request from a remounted view
+            return self._ok(last_connected.model_dump(mode="json"))
         else:
+            self.dbf.disconnect()
             self.dbf.from_schema(last_connected)
             try:
                 self.dbf.test_connection()
@@ -109,6 +113,8 @@ class Runner:
             host=creds["host"],
             port=creds["port"],
             dialect=creds["dialect"],
+            drivername=creds.get("drivername"),
+            url_query=creds.get("url_query"),
         ):
             self.dbf.from_schema(saved)
         else:
@@ -124,6 +130,30 @@ class Runner:
 
         return self._ok(self.dbf.to_dict())
 
+    @requires("connection_url")
+    def _handle_set_db_connect_url(self, body: dict) -> dict:
+        self.dbf.disconnect()
+        try:
+            self.dbf.from_url(body["connection_url"])
+            saved = self.dbf.registry.exists(
+                name=self.dbf.name,
+                user=self.dbf.user,
+                host=self.dbf.host,
+                port=self.dbf.port,
+                dialect=self.dbf.dialect,
+                drivername=self.dbf.drivername,
+                url_query=self.dbf.url_query,
+            )
+            if saved:
+                self.dbf.from_schema(saved)
+            self.dbf.test_connection()
+            if not saved:
+                self.dbf.save()
+            return self._ok(self.dbf.to_dict())
+        except Exception as e:
+            self.dbf.disconnect()
+            return self._err(str(e))
+
     @requires("name", "host", "port", "user", "dialect")
     def _handle_set_db_reconnect(self, creds: dict):
         self.dbf.disconnect()
@@ -133,6 +163,8 @@ class Runner:
             host=creds["host"],
             port=creds["port"],
             dialect=creds["dialect"],
+            drivername=creds.get("drivername"),
+            url_query=creds.get("url_query"),
         ):
             self.dbf.from_schema(schema)
             try:
@@ -168,7 +200,10 @@ class Runner:
     @requires(connected=True)
     def _handle_get_db_tables(self, _=None) -> dict:
         table_info = {"table_data": {}, "sorted_tables": []}
-        _ = self.dbf.engine
+        # Re-reflect so refresh picks up schema changes, and warm the cache
+        # before both threads read it.
+        self.dbf.clear_schema_cache()
+        _ = self.dbf.schema
         t1 = threading.Thread(
             target=lambda: table_info.update(table_data=self.dbf.get_tables())
         )
@@ -301,6 +336,8 @@ class Runner:
 
     @requires("sql")
     def _handle_run_sql_query(self, body: dict) -> dict:
+        # The query may change the schema
+        self.dbf.clear_schema_cache()
         try:
             result_queue = Queue()
             p = Process(

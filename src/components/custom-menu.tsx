@@ -1,11 +1,9 @@
 "use client"
 
-import { useState } from "react"
-import { Icon } from "@iconify/react"
 import { LaptopIcon, MoonIcon, SunIcon } from "@radix-ui/react-icons"
-import { openUrl } from "@tauri-apps/plugin-opener"
-import { Sailboat } from "lucide-react"
+import { Icon } from "@iconify/react"
 import { useTheme } from "next-themes"
+import { openUrl } from "@tauri-apps/plugin-opener"
 
 import { cn } from "@/lib/utils"
 
@@ -67,27 +65,18 @@ export function Menu() {
           <AboutDialog />
         </Dialog>
 
-        <div className="ml-auto flex items-center pr-2">
-          <button
-            className={cn(
-              "flex items-center gap-2 rounded bg-transparent px-6 py-2 text-sm font-medium",
-              "text-muted-foreground hover:bg-card hover:text-accent-foreground"
-            )}
-            onClick={() => openUrl("https://github.com/MZaFaRM/DataSmith")}
-          >
-            <Icon icon="cib:github" className="h-5 w-5" />
-            Github
-          </button>
-          <button
-            className={cn(
-              "flex items-center gap-2 rounded bg-transparent px-2 py-2 text-sm font-medium",
-              "mr-4 text-muted-foreground hover:bg-card hover:text-accent-foreground"
-            )}
-            onClick={() => openUrl("https://buymeacoffee.com/mzafarm")}
-          >
-            <Icon icon="simple-icons:buymeacoffee" className="h-5 w-5" />
-          </button>
-        </div>
+        <button
+          className={cn(
+            "ml-auto inline-flex items-center gap-2 rounded px-3 py-1.5 text-sm font-medium",
+            "text-muted-foreground hover:bg-card hover:text-foreground"
+          )}
+          aria-label="Open DataSmith on GitHub"
+          title="Open DataSmith on GitHub"
+          onClick={() => openUrl("https://github.com/MZaFaRM/DataSmith")}
+        >
+          <Icon icon="cib:github" className="h-5 w-5" />
+          <span>GitHub</span>
+        </button>
       </div>
     </div>
   )

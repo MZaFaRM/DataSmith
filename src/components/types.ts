@@ -27,6 +27,9 @@ export interface DBCreds {
   name: string
   dialect: DBDialectType
   password?: string
+  drivername?: string
+  urlQuery?: string
+  connectionUrl?: string
   error?: string
 }
 
