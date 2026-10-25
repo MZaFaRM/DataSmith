@@ -1,0 +1,30 @@
+autoInstallPeers: false
+
+ignoredBuiltDependencies:
+  - esbuild
+
+overrides:
+  '@babel/core@<=7.29.0': ^7.29.6
+  '@sigstore/core@<=3.2.0': ^3.2.1
+  brace-expansion@>=2.0.0 <3.0.0: ^2.1.7
+  browserslist@<=4.28.6: ^4.28.7
+  defu@<=6.1.4: ^6.1.5
+  esbuild@<=0.24.2: ^0.25.0
+  glob@>=10.2.0 <10.5.0: ^10.5.0
+  ip-address@<=10.7.3: ^10.7.4
+  lodash@<=4.17.23: ^4.18.0
+  minimatch@>=9.0.0 <9.0.7: ^9.0.7
+  nanoid@<3.3.18: ^3.3.18
+  picomatch@<2.3.2: ^2.3.2
+  postcss-selector-parser@<7.1.6: ^7.1.6
+  postcss@<8.5.23: ^8.5.23
+  rollup@>=3.0.0 <3.30.0: ^3.30.0
+  sharp@<0.35.5: ^0.35.5
+  sigstore@<=4.1.0: ^4.1.1
+  source-map-js@>=1.0.0 <1.2.2: ^1.2.2
+  tar@<=7.5.20: ^7.5.21
+  yaml@>=2.0.0 <2.8.3: ^2.8.3
+
+peerDependencyRules:
+  ignoreMissing:
+    - next
