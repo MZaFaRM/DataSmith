@@ -1,12 +1,11 @@
-from datetime import datetime
 import enum
-from typing import Any, Literal, Optional
-import uuid
+from datetime import datetime
+from typing import Any, Literal
+
 from pydantic import BaseModel
-from sqlalchemy import Column, ColumnElement
 
 
-class GeneratorType(str, enum.Enum):
+class GeneratorType(enum.StrEnum):
     faker = "faker"
     regex = "regex"
     foreign = "foreign"
@@ -26,16 +25,16 @@ class ColumnMetadata(BaseModel):
     name: str
     type: str
     unique: bool
-    multi_unique: Optional[tuple[str, ...]] = None
+    multi_unique: tuple[str, ...] | None = None
     primary_key: bool
     nullable: bool
-    default: Optional[str] = None
+    default: str | None = None
     autoincrement: bool
     computed: bool
-    foreign_keys: Optional[ForeignKeyRef] = None
-    length: Optional[int] = None
-    precision: Optional[int] = None
-    scale: Optional[int] = None
+    foreign_keys: ForeignKeyRef | None = None
+    length: int | None = None
+    precision: int | None = None
+    scale: int | None = None
 
     def __eq__(self, other: object) -> bool:
         return isinstance(other, ColumnMetadata) and self.name == other.name
@@ -59,14 +58,14 @@ class TableMetadata(BaseModel):
 
 class ColumnSpec(BaseModel):
     name: str
-    generator: Optional[str] = None
+    generator: str | None = None
     type: GeneratorType | None = None
 
     model_config = {"from_attributes": True}
 
 
 class TableSpec(BaseModel):
-    db_id: Optional[int] = None
+    db_id: int | None = None
     page_size: int = 100
     name: str
     no_of_entries: int
@@ -77,8 +76,8 @@ class TableSpec(BaseModel):
 
 class ErrorPacket(BaseModel):
     type: Literal["warning", "error"] = "error"
-    column: Optional[str] = None
-    msg: Optional[str] = None
+    column: str | None = None
+    msg: str | None = None
 
 
 class TablePacket(BaseModel):
@@ -95,21 +94,21 @@ class TablePacket(BaseModel):
 
 
 class DbCredsSchema(BaseModel):
-    id: Optional[int] = None
+    id: int | None = None
     name: str
     host: str
     port: int | str
     user: str
     password: str = ""
     dialect: str
-    drivername: Optional[str] = None
-    url_query: Optional[str] = None
-    last_connected: Optional[datetime] = None
+    drivername: str | None = None
+    url_query: str | None = None
+    last_connected: datetime | None = None
 
     model_config = {"from_attributes": True}
 
 
-class DBDialectType(str, enum.Enum):
+class DBDialectType(enum.StrEnum):
     MYSQL = "MYSQL"
     POSTGRESQL = "POSTGRESQL"
     UNKNOWN = "UNKNOWN"
@@ -133,6 +132,6 @@ class UsageStatSchema(BaseModel):
     db_id: int
     table_name: str
     new_rows: int
-    last_accessed: Optional[datetime] = None
+    last_accessed: datetime | None = None
 
     model_config = {"from_attributes": True}

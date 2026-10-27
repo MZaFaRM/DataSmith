@@ -69,7 +69,7 @@ def _invoke_langchain_plan(
         progress_queue.put(("request", "Sending schema and prompt to the selected model…"))
         chat_model = ChatOpenAI(
             model=model_name,
-            api_key=api_key or "not-needed",
+            api_key=api_key or "not-needed",  # type: ignore
             base_url=base_url,
             timeout=60,
             max_retries=0,
@@ -85,7 +85,7 @@ def _invoke_langchain_plan(
             ]
         )
         if hasattr(result, "model_dump"):
-            result = result.model_dump(mode="json")
+            result = result.model_dump(mode="json")  # type: ignore
         result_queue.put({"result": result})
         progress_queue.put(("response", "Model returned a structured plan."))
     except Exception as error:
@@ -96,8 +96,7 @@ def _invoke_langchain_plan(
         if api_key:
             trace = trace.replace(api_key, "[redacted]")
         _log(
-            f"LangChain request failed for model {model_name!r}: "
-            f"{type(error).__name__}: {message}\n{trace}",
+            f"LangChain request failed for model {model_name!r}: {type(error).__name__}: {message}\n{trace}",
             error=True,
         )
         detail = message.strip() or type(error).__name__
@@ -105,11 +104,7 @@ def _invoke_langchain_plan(
             detail = detail[:597] + "..."
         error_message = f"Provider request failed ({type(error).__name__}): {detail}"
         progress_queue.put(("error", error_message))
-        result_queue.put(
-            {
-                "error": error_message
-            }
-        )
+        result_queue.put({"error": error_message})
 
 
 def _fetch_model_ids(provider: str, base_url: str, api_key: str) -> list[str]:
@@ -184,7 +179,9 @@ class AiService:
             ) from error
         except (URLError, TimeoutError) as error:
             _log(f"Could not reach the {provider} model-list endpoint: {error}", error=True)
-            raise ValueError("Could not reach the provider model list. Check the endpoint and network.") from error
+            raise ValueError(
+                "Could not reach the provider model list. Check the endpoint and network."
+            ) from error
         except Exception as error:
             _log(f"Model discovery for {provider} failed: {type(error).__name__}: {error}", error=True)
             raise ValueError("The provider returned an unsupported model-list response.") from error
@@ -378,9 +375,7 @@ class AiService:
                 if elapsed >= timeout_seconds:
                     process.terminate()
                     process.join()
-                    raise TimeoutError(
-                        f"The provider did not respond within {timeout_seconds} seconds."
-                    )
+                    raise TimeoutError(f"The provider did not respond within {timeout_seconds} seconds.")
                 if time.monotonic() >= next_wait_log:
                     self._report(
                         progress,
@@ -425,9 +420,7 @@ class AiService:
             raise ValueError("The AI response did not include a valid table plan.")
 
         self._report(progress, "plan", f"Validating the model response for {table_name}…")
-        normalized = self._normalize_table_plan(
-            table_schema, result, body.get("generators", [])
-        )
+        normalized = self._normalize_table_plan(table_schema, result, body.get("generators", []))
         self._report(progress, "done", f"Plan for {table_name} is ready to review.")
         _log(
             f"AI table plan completed for provider={provider}, model={model}, "
@@ -442,12 +435,7 @@ class AiService:
             raise ValueError("Choose a supported AI provider.")
         base_url = PROVIDER_URLS.get(provider, str(body.get("base_url", "")).strip())
         parsed = urlparse(base_url)
-        if (
-            parsed.scheme not in ("http", "https")
-            or not parsed.netloc
-            or parsed.username
-            or parsed.password
-        ):
+        if parsed.scheme not in ("http", "https") or not parsed.netloc or parsed.username or parsed.password:
             raise ValueError("Enter a valid HTTP or HTTPS API base URL without embedded credentials.")
         return provider, base_url
 
@@ -462,9 +450,7 @@ class AiService:
             callback(stage, message)
 
     @staticmethod
-    def _normalize_table_plan(
-        table: dict, result: dict, generators: list[str]
-    ) -> dict:
+    def _normalize_table_plan(table: dict, result: dict, generators: list[str]) -> dict:
         allowed_generators = set(generators)
         if not allowed_generators:
             raise ValueError("No Faker methods are available to create a table plan.")
@@ -505,21 +491,14 @@ class AiService:
                         generator = candidate
                     except (ValueError, re.error):
                         generator_type = "faker"
-                        generator = AiService._fallback_faker_generator(
-                            column, allowed_generators
-                        )
-                        reason = (
-                            f"{reason}. The suggested regex was invalid or unsafe; "
-                            f"using {generator}."
-                        )
+                        generator = AiService._fallback_faker_generator(column, allowed_generators)
+                        reason = f"{reason}. The suggested regex was invalid or unsafe; using {generator}."
                 else:
                     generator_type = "faker"
                     generator = (
                         candidate
                         if isinstance(candidate, str) and candidate in allowed_generators
-                        else AiService._fallback_faker_generator(
-                            column, allowed_generators
-                        )
+                        else AiService._fallback_faker_generator(column, allowed_generators)
                     )
                     if generator != candidate:
                         reason = f"{reason}. Using {generator} as a valid Faker fallback."
@@ -540,11 +519,7 @@ class AiService:
 
     @staticmethod
     def _validate_ai_regex(pattern: str, column: dict) -> None:
-        if (
-            len(pattern) > 160
-            or not pattern.startswith("^")
-            or not pattern.endswith("$")
-        ):
+        if len(pattern) > 160 or not pattern.startswith("^") or not pattern.endswith("$"):
             raise ValueError("Regex must be short and anchored.")
         if pattern.count("^") != 1 or pattern.count("$") != 1:
             raise ValueError("Regex must have one start and end anchor.")
@@ -554,10 +529,7 @@ class AiService:
             raise ValueError("Avoid wildcard and negated character classes.")
         if re.search(r"\{\d+,\}", pattern):
             raise ValueError("Regex repetitions must have a bounded length.")
-        if any(
-            char.isspace() or ord(char) < 32 or ord(char) == 127
-            for char in pattern
-        ):
+        if any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in pattern):
             raise ValueError("Regex cannot contain whitespace or control characters.")
 
         max_length = column.get("length")
@@ -586,10 +558,7 @@ class AiService:
             if (
                 not value
                 or len(value) > max_length
-                or any(
-                    char.isspace() or ord(char) < 32 or ord(char) == 127
-                    for char in value
-                )
+                or any(char.isspace() or ord(char) < 32 or ord(char) == 127 for char in value)
                 or compiled.fullmatch(value) is None
             ):
                 raise ValueError("Regex can generate empty, oversized, or unsafe values.")

@@ -1,30 +1,30 @@
 import binascii
 import json
-import logging
 import os
 import platform
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
-from pathlib import Path
 from typing import Any
-from sqlalchemy import event, func, literal, table, union_all
 
 import networkx as nx
-from networkx import DiGraph, Graph
+from networkx import DiGraph
 from sqlalchemy import (
     Connection,
     MetaData,
     Table,
     create_engine,
+    func,
     insert,
     inspect,
+    literal,
     select,
+    table,
+    union_all,
 )
 from sqlalchemy import text as sql_text
-from sqlalchemy.engine import Engine, Inspector
+from sqlalchemy.engine import URL, Engine, make_url
 from sqlalchemy.engine.reflection import Inspector
-from sqlalchemy.engine import URL, make_url
 
 from core.populate.config import DBFRegistry
 from core.settings import LOG_PATH
@@ -38,8 +38,10 @@ from core.utils.types import (
     DbCredsSchema,
     DBDialectType,
     ForeignKeyRef,
+    TableMetadata,
+    TablePacket,
+    UsageStatSchema,
 )
-from core.utils.types import TableMetadata, TablePacket, UsageStatSchema
 
 CONNECT_TIMEOUT = 10  # seconds
 
@@ -209,7 +211,7 @@ class DatabaseFactory:
     def id(self, value: int | None):
         if isinstance(value, int):
             self._id = value
-        elif value == None and hasattr(self, "_id"):
+        elif value is None and hasattr(self, "_id"):
             del self._id
 
     @property
@@ -269,26 +271,18 @@ class DatabaseFactory:
             self.uncommitted = 0
 
     def commit(self):
-        temp = self.uncommitted
         self.uncommitted = 0
-        if hasattr(self, "transaction") and not self.transaction is None:
+        if hasattr(self, "transaction") and self.transaction is not None:
             self.transaction.commit()
         self.transaction = None
         self.registry.reset_usage_stats(db_id=self.id)
-        # self.logger.info(
-        #     f"COMMITTED {temp} row(s) to {self.name} ({self.dialect.value})"
-        # )
 
     def rollback(self):
-        temp = self.uncommitted
         self.uncommitted = 0
-        if hasattr(self, "transaction") and not self.transaction is None:
+        if hasattr(self, "transaction") and self.transaction is not None:
             self.transaction.rollback()
         self.transaction = None
         self.registry.reset_usage_stats(db_id=self.id)
-        # self.logger.info(
-        #     f"ROLLBACK {temp} row(s) in {self.name} ({self.dialect.value})"
-        # )
 
     # def setup_logging(self):
     #     logger = logging.getLogger(f"user-sql-{self.name}")
@@ -312,7 +306,7 @@ class DatabaseFactory:
         if not os.path.exists(log_file):
             return []
 
-        with open(log_file, "r") as f:
+        with open(log_file) as f:
             logs = f.readlines()[-lines:]
 
         return [log.strip() for log in logs]
@@ -553,7 +547,7 @@ class DatabaseFactory:
             ref_cols = fk.get("referred_columns", [])
             local_cols = fk.get("constrained_columns", [])
 
-            for src, dest in zip(local_cols, ref_cols):
+            for src, dest in zip(local_cols, ref_cols, strict=False):
                 fk_map[src] = ForeignKeyRef(
                     column=dest,
                     table=ref_tbl,
@@ -599,7 +593,7 @@ class DatabaseFactory:
         try:
             meta = MetaData()
             tbl = Table(packet.name, meta, autoload_with=self.engine)
-            entries = [dict(zip(packet.columns, entry)) for entry in packet.entries]
+            entries = [dict(zip(packet.columns, entry, strict=False)) for entry in packet.entries]
 
             stmt = insert(tbl).values(entries)
             # self.logger.info(stmt)
@@ -634,10 +628,10 @@ class DatabaseFactory:
             "FIREBIRD": ('"', '"'),
             "MSSQL": ("[", "]"),
         }
-        l, r = DIALECT_QUOTES.get(self.dialect.upper(), ('"', '"'))
+        left_quote, right_quote = DIALECT_QUOTES.get(self.dialect.upper(), ('"', '"'))
 
         def quote(ident: str) -> str:
-            return f"{l}{ident}{r}" if l else ident
+            return f"{left_quote}{ident}{right_quote}" if left_quote else ident
 
         def sql_literal(val) -> str:
             if val is None or (isinstance(val, str) and val.upper() == "NULL"):

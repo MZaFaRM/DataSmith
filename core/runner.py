@@ -1,19 +1,19 @@
 import json
-from multiprocessing import Manager, Process, Queue
 import sys
 import threading
 import time
 import traceback
-from typing import Any
 import uuid
+from multiprocessing import Manager, Process, Queue
+from typing import Any
+
 from core.ai import AiPlanCancelled, AiService
 from core.helpers import requires
-from core.populate.subprocess import generate_packets, run_sql_worker
-from core.utils.types import TableSpec
-
-from core.populate.populator import Populator
 from core.populate.factory import DatabaseFactory
+from core.populate.populator import Populator
+from core.populate.subprocess import generate_packets, run_sql_worker
 from core.utils.response import Request, Response
+from core.utils.types import TableSpec
 
 
 class Runner:
@@ -101,7 +101,7 @@ class Runner:
         if req.kind == "ai_plan_table":
             request_id = (req.body or {}).get("request_id")
             with self._ai_cancel_lock:
-                self._ai_cancel_events.pop(request_id, None)
+                self._ai_cancel_events.pop(request_id, None) # type: ignore
 
     def handle_command(self, command: Request) -> dict:
         try:
@@ -186,9 +186,9 @@ class Runner:
         try:
             self.dbf.from_url(body["connection_url"])
             saved = self.dbf.registry.exists(
-                name=self.dbf.name,
-                user=self.dbf.user,
-                host=self.dbf.host,
+                name=self.dbf.name, # type: ignore
+                user=self.dbf.user, # type: ignore
+                host=self.dbf.host, # type: ignore
                 port=self.dbf.port,
                 dialect=self.dbf.dialect,
                 drivername=self.dbf.drivername,

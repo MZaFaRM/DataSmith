@@ -1,14 +1,14 @@
 import re
-from typing import Any, Optional
+from typing import Any, Literal
+
 from pydantic import BaseModel, model_validator
-from typing_extensions import Literal
 
 
 class Response(BaseModel):
     status: Literal["ok", "error", "pending"]
-    payload: Optional[Any] = None
-    error: Optional[str] = None
-    traceback: Optional[str] = None
+    payload: Any | None = None
+    error: str | None = None
+    traceback: str | None = None
 
     def to_dict(self) -> dict:
         return self.model_dump()

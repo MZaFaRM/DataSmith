@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import Optional
 
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
@@ -36,7 +35,7 @@ class DBFRegistry:
                     text("ALTER TABLE db_creds ADD COLUMN url_query TEXT")
                 )
 
-    def last_connected(self) -> Optional[DbCredsSchema]:
+    def last_connected(self) -> DbCredsSchema | None:
         with self.session() as session:
             row = (
                 session.query(DbCredsModel)
@@ -63,7 +62,7 @@ class DBFRegistry:
         dialect: str | DBDialectType,
         drivername: str | None = None,
         url_query: str | None = None,
-    ) -> Optional[DbCredsSchema]:
+    ) -> DbCredsSchema | None:
         with self.session() as session:
             row = (
                 session.query(DbCredsModel)

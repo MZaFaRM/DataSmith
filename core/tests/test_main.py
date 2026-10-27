@@ -1,11 +1,6 @@
 import pytest
+
 from core.runner import Runner
-from core.utils.response import Request
-
-
-import json
-import pytest
-from unittest.mock import patch, MagicMock
 from core.utils.response import Request
 
 TEST_CREDS = {
@@ -21,12 +16,11 @@ TEST_CREDS = {
 def runner():
     return Runner()
 
+
 def test_run_sql_query_h(runner: Runner):
     res = runner.handle_command(Request(kind="set_db_reconnect", body=TEST_CREDS))
     assert res["status"] == "ok", res["error"]
-    res = runner.handle_command(
-        Request(kind="run_sql_query", body={"sql": "SELECT * FROM students"})
-    )
+    res = runner.handle_command(Request(kind="run_sql_query", body={"sql": "SELECT * FROM students"}))
     assert res["status"] == "ok"
 
 
@@ -68,9 +62,7 @@ def test_get_db_info(runner: Runner):
 def test_run_sql_query(runner: Runner):
     res = runner.handle_command(Request(kind="set_db_reconnect", body=TEST_CREDS))
     assert res["status"] == "ok", res["error"]
-    res = runner.handle_command(
-        Request(kind="run_sql_query", body={"sql": "SELECT * FROM students"})
-    )
+    res = runner.handle_command(Request(kind="run_sql_query", body={"sql": "SELECT * FROM students"}))
     assert res["status"] == "ok"
 
 
@@ -225,9 +217,7 @@ def test_uncommitted(runner: Runner):
     assert response["status"] == "ok", f"Load spec failed: {response['error']}"
 
     for i in range(1, 4):
-        load_res = runner.handle_command(
-            Request(kind="get_gen_packets", body=response["payload"])
-        )
+        load_res = runner.handle_command(Request(kind="get_gen_packets", body=response["payload"]))
         assert load_res["status"] == "ok", load_res["error"]
 
         insert_res = runner.handle_command(
@@ -250,9 +240,7 @@ def test_commit_and_rollback(runner: Runner):
     response = runner.handle_command(Request(kind="get_pref_spec", body=body))
     assert response["status"] == "ok", f"Load spec failed: {response['error']}"
 
-    load_res = runner.handle_command(
-        Request(kind="get_gen_packets", body=response["payload"])
-    )
+    load_res = runner.handle_command(Request(kind="get_gen_packets", body=response["payload"]))
     assert load_res["status"] == "ok", load_res["error"]
 
     insert_res = runner.handle_command(
@@ -271,9 +259,7 @@ def test_commit_and_rollback(runner: Runner):
     commit_res = runner.handle_command(Request(kind="set_db_commit", body={}))
     assert commit_res["status"] == "ok", commit_res["error"]
 
-    runner.handle_command(
-        Request(kind="run_sql_query", body={"sql": "DELETE FROM teachers LIMIT 50;"})
-    )
+    runner.handle_command(Request(kind="run_sql_query", body={"sql": "DELETE FROM teachers LIMIT 50;"}))
     assert commit_res["status"] == "ok", commit_res["error"]
 
 
@@ -284,9 +270,7 @@ def test_get_gen_packets_order(runner: Runner):
     assert res["status"] == "ok", res["error"]
 
     # load user table spec
-    req = Request(
-        kind="get_pref_spec", body={"dbId": runner.dbf.id, "tableName": "user"}
-    )
+    req = Request(kind="get_pref_spec", body={"dbId": runner.dbf.id, "tableName": "user"})
     res = runner.handle_command(req)
     assert res["status"] == "ok", f"Load spec failed: {res['error']}"
 

@@ -1,21 +1,21 @@
 import ast
 import contextlib
-from numbers import Number
 import random
 import re
 import traceback
-from typing import Any, Callable, Generator
 import uuid
+from collections.abc import Callable, Generator
+from numbers import Number
+from typing import Any
 
-from faker import Faker
 import faker
 import rstr
+from faker import Faker
 
-from core.helpers import cap_string, cap_numeric
+from core.helpers import cap_numeric, cap_string
 from core.utils.exceptions import ValidationError, ValidationWarning, VerificationError
-from core.utils.types import ColumnMetadata, ColumnSpec, ErrorPacket
+from core.utils.types import ColumnMetadata, ColumnSpec, ErrorPacket, TablePacket, TableSpec
 from core.utils.types import GeneratorType as GType
-from core.utils.types import TablePacket, TableSpec
 
 from .factory import ContextFactory, DatabaseFactory
 
@@ -58,7 +58,7 @@ class Populator:
 
         progress["column"] = ""
         columns = list(column_entries.keys())
-        rows = list(map(list, zip(*column_entries.values())))
+        rows = list(map(list, zip(*column_entries.values(), strict=False)))
 
         return table_spec, TablePacket(
             id=str(uuid.uuid4()),
@@ -334,7 +334,7 @@ class Populator:
                     return False
 
             # Check each part of the tuple in DB
-            for sibling, val in zip(sibling_columns, current_row):
+            for sibling, val in zip(sibling_columns, current_row, strict=False):
                 seen_key = f"{table_name}.{sibling}"
                 seen = self.fetch_existing_values(context, key=seen_key)
                 if val in seen:
@@ -410,13 +410,15 @@ class GeneratorFactory:
                 yield gen(columns=columns)
 
         except SyntaxError as e:
-            raise VerificationError(f"Syntax Error in Python script: {e}")
+            raise VerificationError(f"Syntax Error in Python script: {e}") from e
         except Exception as e:
-            raise Exception(str(e), str(traceback.format_exc()))
+            raise Exception(str(e), str(traceback.format_exc())) from e
 
     def make_regex(self, context: ContextFactory) -> Generator[Any, None, None]:
         col = context.column
-        regex_fn = lambda: rstr.xeger(context.col_spec.generator or "")
+        def regex_fn():
+            return rstr.xeger(context.col_spec.generator or "")
+
         while True:
             val = regex_fn()
             if isinstance(val, str):
@@ -434,7 +436,7 @@ class GeneratorFactory:
         if not fk:
             raise ValueError(f"No foreign key reference for column {column.name}")
 
-        if not f"{fk.table}.{fk.column}" in cache:
+        if f"{fk.table}.{fk.column}" not in cache:
             cache[f"{fk.table}.{fk.column}"] = list(
                 map(str, dbf.get_existing_values(fk.table, fk.column))
             )

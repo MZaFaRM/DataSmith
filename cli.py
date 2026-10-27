@@ -1,5 +1,6 @@
-from multiprocessing import freeze_support
 import sys
+from multiprocessing import freeze_support
+
 from core.runner import Runner
 
 if __name__ == "__main__":
