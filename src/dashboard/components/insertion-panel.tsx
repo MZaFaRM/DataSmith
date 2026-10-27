@@ -5,6 +5,7 @@ import {
   invokeGetFakerMethods,
   invokeLoadSpec,
 } from "@/api/fill"
+import DatabaseAiDialog from "@/dashboard/components/ui/database-ai-dialog"
 import InsertTab from "@/dashboard/components/ui/insert-tab"
 import RenderLogs from "@/dashboard/components/ui/log-tab"
 import RenderPreview from "@/dashboard/components/ui/preview-tab"
@@ -152,6 +153,15 @@ export default function InsertionPanel({
     })
   }
 
+  function applyAiTablePlan(plan: TableSpecEntry) {
+    setGlobalSpecs((previous) => ({ ...previous, [plan.name]: plan }))
+    if (activeTable === plan.name) setTableSpec(plan)
+    toast({
+      title: "Table plan applied",
+      description: `Generator settings updated for ${plan.name}. Review the table and insert it from the normal workflow.`,
+    })
+  }
+
   async function loadTableSpecs(tableData: TableMetadata | null = null) {
     // console.log("Got table to load spec: ", tableData)
     if (!tableData) return
@@ -248,6 +258,15 @@ export default function InsertionPanel({
           width: availableWidth,
         }}
       >
+        {dbCreds && (
+          <div className="mb-3 flex justify-end">
+            <DatabaseAiDialog
+              generators={fakerMethods}
+              tableName={tableData?.name ?? null}
+              onApply={applyAiTablePlan}
+            />
+          </div>
+        )}
         <div>
           {!activeTable ? (
             <>

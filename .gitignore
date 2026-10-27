@@ -268,5 +268,7 @@ debug.log
 TODO.md
 .aider*
 
-.vscode/
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
 sidecar/

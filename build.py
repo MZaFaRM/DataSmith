@@ -12,6 +12,8 @@ def build():
         "--onefile",
         "--distpath=sidecar",
         "--hidden-import=cryptography",
+        "--hidden-import=langchain_openai",
+        "--hidden-import=langchain_core.messages",
         "--noconfirm",
         "--clean",
         "--noconsole",

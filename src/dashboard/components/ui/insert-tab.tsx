@@ -9,16 +9,7 @@ import CodeMirror, { EditorView } from "@uiw/react-codemirror"
 import { useTheme } from "next-themes"
 
 import { cn } from "@/lib/utils"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import {
   Command,
   CommandEmpty,
@@ -27,7 +18,6 @@ import {
   CommandList,
 } from "@/components/ui/command"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
 import {
   Popover,
   PopoverContent,
@@ -49,15 +39,6 @@ import {
   TableSpecEntry,
 } from "@/components/types"
 
-type AiMode = "autofill" | "sample" | null
-
-interface GeneratorSuggestion {
-  column: ColumnData
-  type: GeneratorType
-  generator: string | null
-  reason: string
-}
-
 interface InsertTabProps {
   fakerMethods: string[] | null
   tableData: TableMetadata
@@ -72,70 +53,20 @@ export default function InsertTab({
   setTableSpec,
 }: InsertTabProps) {
   const [hoveredGroup, setHoveredGroup] = useState<string[] | null>(null)
-  const [aiMode, setAiMode] = useState<AiMode>(null)
-  const [sampleData, setSampleData] = useState("")
-  const [suggestions, setSuggestions] = useState<GeneratorSuggestion[]>([])
-  const [isAnalyzing, setIsAnalyzing] = useState(false)
-
-  function startAutoFill() {
-    setSuggestions(buildSuggestions(tableData.columns, fakerMethods))
-    setAiMode("autofill")
-  }
-
-  function startSampleFlow() {
-    setSuggestions([])
-    setAiMode("sample")
-  }
-
-  function analyzeSample() {
-    setIsAnalyzing(true)
-    window.setTimeout(() => {
-      const headers = readSampleHeaders(sampleData)
-      setSuggestions(buildSuggestions(tableData.columns, fakerMethods, headers))
-      setIsAnalyzing(false)
-    }, 650)
-  }
-
-  function applySuggestions() {
-    setTableSpec((previous) => {
-      if (!previous) return previous
-      const columns = { ...previous.columns }
-      for (const suggestion of suggestions) {
-        columns[suggestion.column.name] = {
-          name: suggestion.column.name,
-          type: suggestion.type,
-          generator: suggestion.generator,
-        }
-      }
-      return { ...previous, columns }
-    })
-    setAiMode(null)
-    setSampleData("")
-  }
 
   return (
     <div className="flex h-full w-full flex-col overflow-auto">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-muted/30 px-4 py-3">
         <div className="flex items-center gap-2">
           <span className="flex h-8 w-8 items-center justify-center rounded-md border bg-background text-primary">
-            <Icon icon="lucide:sparkles" className="h-4 w-4" />
+            <Icon icon="lucide:sliders-horizontal" className="h-4 w-4" />
           </span>
           <div>
-            <p className="text-sm font-medium">AI data setup</p>
+            <p className="text-sm font-medium">Column generators</p>
             <p className="text-xs text-muted-foreground">
-              Build a generator plan for this table
+              Choose how each field should be populated
             </p>
           </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={startAutoFill}>
-            <Icon icon="lucide:sparkles" className="mr-2 h-4 w-4" />
-            Auto-fill with AI
-          </Button>
-          <Button size="sm" onClick={startSampleFlow}>
-            <Icon icon="lucide:table-2" className="mr-2 h-4 w-4" />
-            Generate from sample data
-          </Button>
         </div>
       </div>
       <Table className="w-full flex-1">
@@ -165,202 +96,8 @@ export default function InsertTab({
         </TableBody>
       </Table>
 
-      <Dialog
-        open={aiMode !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setAiMode(null)
-            setIsAnalyzing(false)
-          }
-        }}
-      >
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Icon icon="lucide:sparkles" className="h-5 w-5 text-primary" />
-              {aiMode === "sample"
-                ? suggestions.length
-                  ? "Review sample-based suggestions"
-                  : "Generate from sample data"
-                : "Suggested generator plan"}
-            </DialogTitle>
-            <DialogDescription>
-              {aiMode === "sample"
-                ? suggestions.length
-                  ? `Matched your sample structure to ${suggestions.length} columns. Review the proposed generators before applying.`
-                  : "Paste a small CSV or JSON example. DataSmith will use its structure to suggest matching generators."
-                : "Review the proposed generators. You can change any setting in the table after applying."}
-            </DialogDescription>
-          </DialogHeader>
-
-          {aiMode === "sample" && !suggestions.length ? (
-            <div className="space-y-3">
-              <Textarea
-                value={sampleData}
-                onChange={(event) => setSampleData(event.target.value)}
-                placeholder={'name,email,city\nAvery Stone,avery@example.com,Doha\n'}
-                className="min-h-40 font-mono text-xs"
-              />
-              <div className="flex items-start gap-2 rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
-                <Icon icon="lucide:shield-check" className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
-                <p>
-                  Sample content stays in this app in this prototype. Only its
-                  column labels are used to match generator suggestions.
-                </p>
-              </div>
-              <DialogFooter>
-                <Button
-                  onClick={analyzeSample}
-                  disabled={!sampleData.trim() || isAnalyzing}
-                >
-                  {isAnalyzing ? (
-                    <>
-                      <Icon icon="lucide:loader-circle" className="mr-2 h-4 w-4 animate-spin" />
-                      Analyzing sample
-                    </>
-                  ) : (
-                    <>
-                      <Icon icon="lucide:sparkles" className="mr-2 h-4 w-4" />
-                      Analyze sample
-                    </>
-                  )}
-                </Button>
-              </DialogFooter>
-            </div>
-          ) : (
-            <>
-              <div className="rounded-md border">
-                <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-3 border-b bg-muted/40 px-3 py-2 text-xs font-medium text-muted-foreground">
-                  <span>Column</span>
-                  <span>Suggested generator</span>
-                </div>
-                <div className="max-h-72 divide-y overflow-y-auto">
-                  {suggestions.map((suggestion) => (
-                    <div
-                      key={suggestion.column.name}
-                      className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-3 px-3 py-2.5"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">
-                          {suggestion.column.name}
-                        </p>
-                        <p className="truncate text-xs text-muted-foreground">
-                          {suggestion.reason}
-                        </p>
-                      </div>
-                      <Badge variant="secondary" className="w-fit max-w-full truncate">
-                        {suggestion.generator || suggestion.type}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setAiMode(null)}>
-                  Cancel
-                </Button>
-                <Button onClick={applySuggestions} disabled={!suggestions.length}>
-                  <Icon icon="lucide:check" className="mr-2 h-4 w-4" />
-                  Apply {suggestions.length} suggestions
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   )
-}
-
-function buildSuggestions(
-  columns: ColumnData[],
-  fakerMethods: string[] | null,
-  sampleHeaders: string[] = []
-): GeneratorSuggestion[] {
-  const available = new Set(fakerMethods ?? [])
-  const methodFor = (name: string, sqlType: string) => {
-    const value = name.toLowerCase().replace(/[^a-z0-9]+/g, "_")
-    const type = sqlType.toLowerCase()
-    const candidates: [RegExp, string, string][] = [
-      [/email|e_mail/, "email", "Email-shaped values"],
-      [/first_?name|given_?name/, "first_name", "Recognized as a first name"],
-      [/last_?name|surname|family_?name/, "last_name", "Recognized as a last name"],
-      [/(^|_)name($|_)/, "name", "Recognized as a person name"],
-      [/phone|mobile|telephone/, "phone_number", "Recognized as a phone number"],
-      [/address|street/, "street_address", "Recognized as an address"],
-      [/city|town/, "city", "Recognized as a city"],
-      [/country/, "country", "Recognized as a country"],
-      [/company|organization|business/, "company", "Recognized as an organization"],
-      [/url|website|link/, "url", "Recognized as a web address"],
-      [/created|updated|date|time|birth/, "date_time", "Recognized as a date or timestamp"],
-      [/uuid|guid/, "uuid4", "Recognized as a UUID"],
-      [/description|comment|message|text|body/, "text", "Recognized as free-form text"],
-    ]
-    const match = candidates.find(([pattern]) => pattern.test(value))
-    if (match && available.has(match[1])) {
-      return { generator: match[1], reason: match[2] }
-    }
-    if (/(int|serial|number)/.test(type) && available.has("pyint")) {
-      return { generator: "pyint", reason: "Numeric database type" }
-    }
-    if (/(float|double|decimal|numeric|real)/.test(type) && available.has("pyfloat")) {
-      return { generator: "pyfloat", reason: "Numeric database type" }
-    }
-    const fallback = ["word", "pystr", "text"].find((method) => available.has(method))
-    return {
-      generator: fallback ?? null,
-      reason: fallback ? "General-purpose sample value" : "Choose a generator in the table",
-    }
-  }
-
-  return columns.map((column): GeneratorSuggestion => {
-    if (column.foreignKeys?.table) {
-      return {
-        column,
-        type: "foreign",
-        generator: `${column.foreignKeys.table}__${column.foreignKeys.column}`,
-        reason: `Keeps the link to ${column.foreignKeys.table}`,
-      }
-    }
-    if (column.autoincrement) {
-      return { column, type: "autoincrement", generator: null, reason: "Database-managed identifier" }
-    }
-    if (column.computed) {
-      return { column, type: "computed", generator: null, reason: "Computed by the database" }
-    }
-
-    const sampleHeader = sampleHeaders.find(
-      (header) => normalizeName(header) === normalizeName(column.name)
-    )
-    const { generator, reason } = methodFor(
-      sampleHeader ?? column.name,
-      column.type
-    )
-    return {
-      column,
-      type: "faker",
-      generator,
-      reason: sampleHeader ? `Matched sample field “${sampleHeader}”` : reason,
-    }
-  })
-}
-
-function readSampleHeaders(sample: string): string[] {
-  try {
-    const parsed: unknown = JSON.parse(sample)
-    const first = Array.isArray(parsed) ? parsed[0] : parsed
-    if (first && typeof first === "object") return Object.keys(first)
-  } catch {
-    // Treat non-JSON input as CSV and use the first row as its header.
-  }
-  return (sample.split(/\r?\n/, 1)[0] ?? "")
-    .split(",")
-    .map((header) => header.trim().replace(/^['"]|['"]$/g, ""))
-    .filter(Boolean)
-}
-
-function normalizeName(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]/g, "")
 }
 
 interface InsertTabRowsProps {

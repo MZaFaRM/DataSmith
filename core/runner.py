@@ -1,13 +1,12 @@
 import json
 from multiprocessing import Manager, Process, Queue
-from random import SystemRandom
 import sys
 import threading
 import time
 import traceback
 from typing import Any
 import uuid
-
+from core.ai import AiPlanCancelled, AiService
 from core.helpers import requires
 from core.populate.subprocess import generate_packets, run_sql_worker
 from core.utils.types import TableSpec
@@ -21,37 +20,88 @@ class Runner:
     def __init__(self):
         self.dbf = DatabaseFactory()
         self.populator = Populator()
+        self.ai = AiService()
+        self._stdout_lock = threading.Lock()
+        self._ai_cancel_lock = threading.Lock()
+        self._ai_cancel_events: dict[str, threading.Event] = {}
 
     def listen(self):
         for line in sys.stdin:
             line = line.strip()
             if not line:
                 continue
-            elif line == "exit":
-                res = json.dumps(Response(status="ok", payload="exiting...").to_dict())
-                print(res, flush=True)
+            if line == "exit":
+                self._write_response(
+                    Response(status="ok", payload="exiting...").to_dict()
+                )
                 break
-
-            _id: str | None = None
-            res: str = "{}"
 
             try:
                 req = json.loads(line)
                 req = Request(**req)
-                _id = req.id
-                res_obj = self.handle_command(req)
-
-                res_obj["id"] = _id
-                res = json.dumps(res_obj)
             except Exception as e:
-                tb = traceback.format_exc()
-                res_obj = Response(status="error", error=str(e), traceback=tb).to_dict()
+                self._write_response(
+                    Response(
+                        status="error", error=str(e), traceback=traceback.format_exc()
+                    ).to_dict()
+                )
+                continue
 
-                if _id is not None:
-                    res_obj["id"] = _id
-                res = json.dumps(res_obj)
-            finally:
-                print(res, flush=True)
+            if req.kind == "ai_plan_table":
+                self._start_ai_request(req)
+            else:
+                self._handle_async_request(req)
+
+    def _start_ai_request(self, req: Request) -> None:
+        body = req.body or {}
+        request_id = body.get("request_id")
+        if not isinstance(request_id, str) or not request_id:
+            response = self._err("AI request ID is missing.")
+            response["id"] = req.id
+            self._write_response(response)
+            return
+
+        with self._ai_cancel_lock:
+            if request_id in self._ai_cancel_events:
+                response = self._err("An AI request with this ID is already active.")
+                response["id"] = req.id
+                self._write_response(response)
+                return
+            self._ai_cancel_events[request_id] = threading.Event()
+        threading.Thread(
+            target=self._handle_async_request, args=(req,), daemon=True
+        ).start()
+
+    def _write_response(self, response: dict) -> None:
+        with self._stdout_lock:
+            print(json.dumps(response), flush=True)
+
+    def _write_progress(self, request_id: str | None, stage: str, message: str) -> None:
+        if not request_id:
+            return
+        progress = {
+            "id": request_id,
+            "event": "progress",
+            "payload": {"stage": stage, "message": message},
+        }
+        with self._stdout_lock:
+            print(json.dumps(progress), flush=True)
+
+    def _handle_async_request(self, req: Request) -> None:
+        if req.kind == "ai_plan_table" and req.body is not None:
+            req.body["progress_id"] = req.id
+        try:
+            response = self.handle_command(req)
+        except Exception as error:
+            response = Response(
+                status="error", error=str(error), traceback=traceback.format_exc()
+            ).to_dict()
+        response["id"] = req.id
+        self._write_response(response)
+        if req.kind == "ai_plan_table":
+            request_id = (req.body or {}).get("request_id")
+            with self._ai_cancel_lock:
+                self._ai_cancel_events.pop(request_id, None)
 
     def handle_command(self, command: Request) -> dict:
         try:
@@ -234,6 +284,56 @@ class Runner:
             return self._err(f"No metadata found for table '{body['name']}'.")
 
         return self._ok(metadata.model_dump(mode="json"))
+
+    def _handle_list_ai_models(self, body: dict) -> dict:
+        try:
+            return self._ok({"models": self.ai.list_models(body)})
+        except ValueError as error:
+            return self._err(str(error))
+
+    def _handle_ai_plan_table(self, body: dict) -> dict:
+        request_id = str(body.get("request_id", ""))
+        with self._ai_cancel_lock:
+            cancel_event = self._ai_cancel_events.get(request_id)
+        if cancel_event is None:
+            return self._err("AI request is no longer active.")
+
+        progress_id = body.get("progress_id")
+        self._write_progress(progress_id, "starting", "Starting table plan request…")
+        try:
+            plan = self.ai.create_table_plan(
+                body,
+                database=self.dbf,
+                cancel_event=cancel_event,
+                progress=lambda stage, message: self._write_progress(
+                    progress_id, stage, message
+                ),
+            )
+            return self._ok(plan)
+        except AiPlanCancelled as error:
+            self._write_progress(progress_id, "cancelled", str(error))
+            return self._err(str(error))
+        except ValueError as error:
+            self._write_progress(progress_id, "error", str(error))
+            return self._err(str(error))
+        except Exception:
+            if sys.stderr is not None:
+                traceback.print_exc(file=sys.stderr)
+            self._write_progress(
+                progress_id,
+                "error",
+                "Table plan failed unexpectedly. Check the backend AI log.",
+            )
+            return self._err("Table plan failed unexpectedly. Check the backend AI log.")
+
+    def _handle_cancel_ai_table_plan(self, body: dict) -> dict:
+        request_id = str(body.get("request_id", ""))
+        with self._ai_cancel_lock:
+            cancel_event = self._ai_cancel_events.get(request_id)
+        if cancel_event is None:
+            return self._ok({"cancelled": False})
+        cancel_event.set()
+        return self._ok({"cancelled": True})
 
     @requires(TableSpec, connected=True)
     def _handle_get_gen_packets(self, body: dict) -> dict:
