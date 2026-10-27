@@ -1,8 +1,8 @@
 
-![banner.png](./banner.png)
+![banner.png](./assets/media/banner.png)
 
 <div align="center">
-  <img src="./app-icon.png" width="100px" />
+  <img src="./assets/brand/app-icon.png" width="100px" />
   <h1>DataSmith</h1>
 </div>
 
@@ -53,7 +53,7 @@ If you’d like to build it yourself or contribute, follow the instructions belo
 - Tauri CLI:
 
   ```bash
-  pnpm add -D @tauri-apps/cli
+  pnpm --dir frontend add -D @tauri-apps/cli
   ```
 
 ### Steps
@@ -89,7 +89,7 @@ If you’d like to build it yourself or contribute, follow the instructions belo
 
 Boot up the application, connect to a database, and easily start generating and inserting custom data.
 
-![banner](./banner.gif)
+![banner](./assets/media/banner.gif)
 
 ---
 

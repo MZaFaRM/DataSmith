@@ -214,6 +214,7 @@ venv/
 
 # dependency directories
 node_modules/
+.vite/
 
 # Optional npm and yarn cache directory
 .npm/

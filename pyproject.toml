@@ -1,0 +1,27 @@
+[project]
+name = "datasmith"
+version = "0.1.0"
+description = "datasmith sidecar"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.ruff]
+line-length = 114
+target-version = "py312"
+fix = true
+
+[tool.ruff.lint]
+ignore = ["B008", "E501", "E402"]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"routers.py" = ["I001"]
+
+[tool.pyright]
+# Resolve the app's unqualified imports (it runs with src/app on PYTHONPATH).
+include = ["src/app"]
+extraPaths = ["src/app"]
+pythonVersion = "3.12"
+typeCheckingMode = "basic"

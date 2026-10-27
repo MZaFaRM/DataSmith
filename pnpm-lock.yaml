@@ -28,7 +28,9 @@ overrides:
 
 importers:
 
-  .:
+  .: {}
+
+  frontend:
     dependencies:
       '@codemirror/lang-python':
         specifier: ^6.2.1
