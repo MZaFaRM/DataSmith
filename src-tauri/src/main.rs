@@ -25,6 +25,11 @@ fn send(payload: String, state: State<Shared>) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn restart_app(app: tauri::AppHandle) {
+    app.restart();
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -100,7 +105,7 @@ fn main() {
             app.manage(Arc::new(Mutex::new(Some(Bridge(child)))));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![send])
+        .invoke_handler(tauri::generate_handler![send, restart_app])
         .run(tauri::generate_context!())
         .expect("run tauri");
 }

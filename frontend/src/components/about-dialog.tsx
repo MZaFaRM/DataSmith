@@ -2,6 +2,7 @@ import { useState } from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { UpdateIcon } from "@radix-ui/react-icons"
 import { getName, getTauriVersion, getVersion } from "@tauri-apps/api/app"
+import { invoke } from "@tauri-apps/api/core"
 import { arch } from "@tauri-apps/plugin-os"
 import { open } from "@tauri-apps/plugin-shell"
 import { check, Update } from "@tauri-apps/plugin-updater"
@@ -26,6 +27,7 @@ export function AboutDialog() {
   const [tauriVersion, setTauriVersion] = useState("")
   const [arc, setArc] = useState("")
   const [loading, setLoading] = useState(false)
+  const [availableUpdate, setAvailableUpdate] = useState<Update | null>(null)
 
   getVersion().then((x) => setVersion(x))
   getName().then((x) => setName(x))
@@ -35,15 +37,42 @@ export function AboutDialog() {
   async function handleUpdateCheck() {
     setLoading(true)
     try {
+      await availableUpdate?.close()
+      setAvailableUpdate(null)
       const update = await check()
       if (!update) {
         setUpdateText("You have the latest version.")
       } else {
-        setUpdateText(`Found new version ${update.version}`)
+        setAvailableUpdate(update)
+        setUpdateText(`Version ${update.version} is available.`)
       }
     } catch (error) {
       setUpdateText("Couldn't update due to some exceptions.")
       console.error("Error while updating", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleUpdateInstall() {
+    if (!availableUpdate) return
+
+    setLoading(true)
+    setUpdateText("Downloading and installing update…")
+    let installed = false
+    try {
+      await availableUpdate.downloadAndInstall()
+      installed = true
+      setAvailableUpdate(null)
+      setUpdateText("Update installed. Restarting DataSmith…")
+      await invoke("restart_app")
+    } catch (error) {
+      setUpdateText(
+        installed
+          ? "Update installed, but restart failed. Please restart DataSmith manually."
+          : "Couldn't install the update. Please try again later."
+      )
+      console.error("Error while applying update", error)
     } finally {
       setLoading(false)
     }
@@ -72,6 +101,14 @@ export function AboutDialog() {
         </DialogDescription>
 
         <span className="text-xs text-gray-400">{updateText}</span>
+        {availableUpdate?.body && (
+          <div className="max-h-40 w-full overflow-y-auto rounded-md border bg-muted/30 p-3 text-left text-xs">
+            <p className="mb-1 font-medium">What’s new</p>
+            <div className="whitespace-pre-wrap text-muted-foreground">
+              {availableUpdate.body}
+            </div>
+          </div>
+        )}
         <DialogDescription className="flex flex-row"></DialogDescription>
       </DialogHeader>
 
@@ -90,15 +127,29 @@ export function AboutDialog() {
           />
         </div>
 
-        <Button
-          type="submit"
-          variant="outline"
-          className="h-7 gap-1"
-          onClick={() => handleUpdateCheck()}
-        >
-          <UpdateIcon className={cn(loading && "animate-spin")} /> Check for
-          Updates
-        </Button>
+        {availableUpdate ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="h-7 gap-1"
+            disabled={loading}
+            onClick={() => void handleUpdateInstall()}
+          >
+            <UpdateIcon className={cn(loading && "animate-spin")} />
+            {loading ? "Installing…" : "Install & Restart"}
+          </Button>
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            className="h-7 gap-1"
+            disabled={loading}
+            onClick={() => void handleUpdateCheck()}
+          >
+            <UpdateIcon className={cn(loading && "animate-spin")} />
+            {loading ? "Checking…" : "Check for Updates"}
+          </Button>
+        )}
         <DialogPrimitive.Close
           type="submit"
           className={buttonVariants({ variant: "ghost", className: "h-7" })}

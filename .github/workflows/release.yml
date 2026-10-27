@@ -60,7 +60,7 @@ jobs:
           const lockPath = 'src-tauri/Cargo.lock'
           const lockfile = fs.readFileSync(lockPath, 'utf8')
           const updatedLockfile = lockfile.replace(
-            /(\[\[package\]\]\nname = "DataSmith"\nversion = ")[^"]+("/,
+            /(\[\[package\]\]\nname = "DataSmith"\nversion = ")[^"]+(\")/,
             `$1${version}$2`,
           )
           if (updatedLockfile === lockfile) throw new Error('Could not update DataSmith in Cargo.lock')
@@ -92,7 +92,7 @@ jobs:
               repo: context.repo.repo,
               tag_name: process.env.release_tag,
               name: process.env.release_tag,
-              body: '*This release was generated automatically using GitHub Actions.*',
+              generate_release_notes: true,
               draft: true,
               prerelease: false
             })
@@ -161,6 +161,8 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           releaseId: ${{ needs.create-release.outputs.release_id }}
+          tagName: ${{ needs.create-release.outputs.tag_name }}
+          releaseDraft: true
 
   publish-release:
     permissions:
