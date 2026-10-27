@@ -310,7 +310,7 @@ export default function DatabaseAiDialog({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid min-h-0 flex-1 overflow-y-auto md:h-[460px] md:grid-cols-[22rem_1fr] md:overflow-hidden">
+          <div className="grid min-h-0 flex-1 overflow-y-auto md:h-[460px] md:grid-cols-[22rem_minmax(0,1fr)] md:overflow-hidden">
             {/* Left rail */}
             <aside className="flex flex-col gap-4 border-b bg-muted/30 p-5 md:overflow-y-auto md:border-b-0 md:border-r">
               {!plan ? (
@@ -483,37 +483,6 @@ export default function DatabaseAiDialog({
                     </p>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="ai-row-count"
-                      className="text-xs font-medium text-muted-foreground"
-                    >
-                      Rows to generate
-                    </label>
-                    <Input
-                      id="ai-row-count"
-                      type="number"
-                      min={1}
-                      max={10000}
-                      step={1}
-                      value={plan.noOfEntries}
-                      className="h-9 bg-background tabular-nums"
-                      onChange={(event) => {
-                        const value = Number.parseInt(event.target.value, 10)
-                        setPlan((current) =>
-                          current
-                            ? {
-                                ...current,
-                                noOfEntries: Number.isFinite(value)
-                                  ? Math.max(1, Math.min(10000, value))
-                                  : 1,
-                              }
-                            : current
-                        )
-                      }}
-                    />
-                  </div>
-
                   <div>
                     <p className="text-xs font-medium text-muted-foreground">
                       Planned by
@@ -533,7 +502,7 @@ export default function DatabaseAiDialog({
             </aside>
 
             {/* Main area */}
-            <section className="flex min-h-0 flex-col gap-3 p-5">
+            <section className="flex min-h-0 min-w-0 flex-col gap-3 p-5">
               {!plan ? (
                 <>
                   <div className="flex items-baseline justify-between gap-3">
@@ -599,8 +568,8 @@ export default function DatabaseAiDialog({
                 </>
               ) : (
                 <>
-                  <div className="min-h-0 flex-1 overflow-auto rounded-lg border">
-                    <table className="w-full text-sm">
+                  <div className="min-h-0 min-w-0 flex-1 overflow-auto rounded-lg border">
+                    <table className="w-max min-w-full text-sm">
                       <thead className="sticky top-0 z-10 bg-muted text-xs text-muted-foreground">
                         <tr>
                           <th className="px-4 py-2.5 text-left font-medium">
