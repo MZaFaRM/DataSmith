@@ -1,17 +1,21 @@
 import json
 import logging
 import os
-from multiprocessing import Queue, get_context
-from queue import Empty
+import re
 import sys
 import time
 import traceback
-from typing import Callable
+from collections.abc import Callable
+from multiprocessing import Queue, get_context
+from queue import Empty
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
-from urllib.request import Request as URLRequest, urlopen
-from core.settings import LOG_PATH
+from urllib.request import Request as URLRequest
+from urllib.request import urlopen
 
+import rstr
+
+from core.settings import LOG_PATH
 
 PROVIDER_URLS = {
     "gemini": "https://generativelanguage.googleapis.com/v1beta/openai",
@@ -272,10 +276,19 @@ class AiService:
                         "type": "object",
                         "properties": {
                             "column": {"type": "string"},
+                            "generator_type": {
+                                "type": "string",
+                                "enum": ["faker", "regex"],
+                            },
                             "generator": {"type": "string"},
                             "reason": {"type": "string"},
                         },
-                        "required": ["column", "generator", "reason"],
+                        "required": [
+                            "column",
+                            "generator_type",
+                            "generator",
+                            "reason",
+                        ],
                         "additionalProperties": False,
                     },
                 },
@@ -286,9 +299,24 @@ class AiService:
         system_prompt = (
             "Create a synthetic data generation plan for the one provided table. "
             "Return every provided column exactly once. Keep foreign-key and "
-            "database-managed columns consistent with their metadata. Use only "
-            "one exact generator name from the provided list for every ordinary "
-            "column; never use a generic label such as 'faker'. Set "
+            "database-managed columns consistent with their metadata. The "
+            "response schema requires generator_type and generator for every "
+            "column; for foreign-key or database-managed columns, use "
+            "generator_type 'faker' and any listed Faker method as placeholders "
+            "because those fields will be ignored. For each ordinary column "
+            "choose either generator_type 'faker' with one exact "
+            "generator name from the provided list, or generator_type 'regex' "
+            "with one standalone, Python-compatible regular expression for the "
+            "column. Make it exact: use ^ at the start and $ at the end, explicit "
+            "character classes such as [A-Z] or [0-9], and bounded repetitions "
+            "such as [A-Z]{3}. Do not concatenate patterns, add explanations, "
+            "or use whitespace, control characters, ., \\w, \\s, *, +, ?, "
+            "lookarounds, or backreferences. Match the column name, SQL type, "
+            "and maximum length. Regex generation is only for compact structured specific "
+            "values; use Faker for natural language, names, or dates. Use regex "
+            "for structured formats such as codes, identifiers, and fixed-width "
+            "strings. "
+            "Never return a generic generator label such as 'faker'. Set "
             "the row count based on the user's request, defaulting to 50 when "
             "unspecified. Do not return generated values or sample rows."
         )
@@ -466,19 +494,35 @@ class AiService:
                 generator = None
                 reason = "Computed by the database"
             else:
-                generator_type = "faker"
                 model_column = model_columns.get(column["name"], {})
                 candidate = model_column.get("generator")
-                generator = (
-                    candidate
-                    if isinstance(candidate, str) and candidate in allowed_generators
-                    else AiService._fallback_faker_generator(
-                        column, allowed_generators
-                    )
-                )
                 reason = str(model_column.get("reason", "Choose a generator in the table"))[:240]
-                if generator != candidate:
-                    reason = f"{reason}. Using {generator} as a valid Faker fallback."
+                requested_type = model_column.get("generator_type")
+                if requested_type == "regex" and isinstance(candidate, str):
+                    try:
+                        AiService._validate_ai_regex(candidate, column)
+                        generator_type = "regex"
+                        generator = candidate
+                    except (ValueError, re.error):
+                        generator_type = "faker"
+                        generator = AiService._fallback_faker_generator(
+                            column, allowed_generators
+                        )
+                        reason = (
+                            f"{reason}. The suggested regex was invalid or unsafe; "
+                            f"using {generator}."
+                        )
+                else:
+                    generator_type = "faker"
+                    generator = (
+                        candidate
+                        if isinstance(candidate, str) and candidate in allowed_generators
+                        else AiService._fallback_faker_generator(
+                            column, allowed_generators
+                        )
+                    )
+                    if generator != candidate:
+                        reason = f"{reason}. Using {generator} as a valid Faker fallback."
 
             normalized_columns.append(
                 {
@@ -493,6 +537,62 @@ class AiService:
             "no_of_entries": row_count,
             "columns": normalized_columns,
         }
+
+    @staticmethod
+    def _validate_ai_regex(pattern: str, column: dict) -> None:
+        if (
+            len(pattern) > 160
+            or not pattern.startswith("^")
+            or not pattern.endswith("$")
+        ):
+            raise ValueError("Regex must be short and anchored.")
+        if pattern.count("^") != 1 or pattern.count("$") != 1:
+            raise ValueError("Regex must have one start and end anchor.")
+        if re.search(r"\\[A-Za-z]", pattern):
+            raise ValueError("Use explicit character classes instead of shorthand escapes.")
+        if "." in pattern or "[^" in pattern:
+            raise ValueError("Avoid wildcard and negated character classes.")
+        if re.search(r"\{\d+,\}", pattern):
+            raise ValueError("Regex repetitions must have a bounded length.")
+        if any(
+            char.isspace() or ord(char) < 32 or ord(char) == 127
+            for char in pattern
+        ):
+            raise ValueError("Regex cannot contain whitespace or control characters.")
+
+        max_length = column.get("length")
+        max_length = max_length if isinstance(max_length, int) and max_length > 0 else 128
+        for match in re.finditer(r"\{(\d+)(?:,(\d+))?\}", pattern):
+            lower = int(match.group(1))
+            upper = int(match.group(2) or lower)
+            if lower < 1 or upper < lower or upper > min(max_length, 128):
+                raise ValueError("Regex repetition must have a safe, bounded length.")
+
+        escaped = False
+        for char in pattern:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char in "*+?":
+                raise ValueError("Regex quantifiers must use bounded repetitions.")
+
+        compiled = re.compile(pattern)
+        for _ in range(16):
+            try:
+                value = rstr.xeger(pattern)
+            except Exception as error:
+                raise ValueError("Regex could not generate a value safely.") from error
+            if (
+                not value
+                or len(value) > max_length
+                or any(
+                    char.isspace() or ord(char) < 32 or ord(char) == 127
+                    for char in value
+                )
+                or compiled.fullmatch(value) is None
+            ):
+                raise ValueError("Regex can generate empty, oversized, or unsafe values.")
 
     @staticmethod
     def _fallback_faker_generator(column: dict, allowed_generators: set[str]) -> str:

@@ -71,7 +71,7 @@ export default function DatabaseAiDialog({
   const [customModel, setCustomModel] = useState(false)
   const [apiKey, setApiKey] = useState("")
   const [prompt, setPrompt] = useState(
-    "Create realistic development data for this table. Generate 50 rows."
+    "Create realistic development data for this table."
   )
   const [plan, setPlan] = useState<AiTablePlan | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -306,7 +306,7 @@ export default function DatabaseAiDialog({
             <DialogDescription className="text-xs">
               {plan
                 ? "Check each column's generator and the row count, then apply them to this table's settings."
-                : "Describe the data you want. The AI picks a generator for each column and suggests a row count."}
+                : "Describe the data you want. The AI chooses Faker or creates regex patterns for structured values, then suggests a row count."}
             </DialogDescription>
           </DialogHeader>
 
