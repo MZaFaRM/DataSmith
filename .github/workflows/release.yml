@@ -1,10 +1,16 @@
-name: "App Release"
+name: App Release
 
 on:
-  workflow_dispatch: 
-  push:
-    tags: 
-      - "*"
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Version tag to create (for example, v1.9.2)
+        required: true
+        type: string
+
+concurrency:
+  group: app-release-${{ inputs.release_tag }}
+  cancel-in-progress: false
 
 jobs:
   create-release:
@@ -13,29 +19,79 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release_id: ${{ steps.create-release.outputs.result }}
+      tag_name: ${{ steps.release-version.outputs.tag_name }}
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
-
-      - name: Install Node.js
-        uses: actions/setup-node@v3
+        uses: actions/checkout@v4
         with:
-          node-version: "lts/*"
+          fetch-depth: 0
 
-      - name: Get version
-        run: echo "PACKAGE_VERSION=$(node -p "require('./frontend/package.json').version")" >> $GITHUB_ENV
+      - name: Set release version and create tag
+        id: release-version
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs')
+          const { execFileSync } = require('node:child_process')
+          const tag = process.env.RELEASE_TAG.trim()
+          const match = /^v(\d+)\.(\d+)\.(\d+)$/.exec(tag)
+          if (!match) throw new Error('Enter a version tag in vMAJOR.MINOR.PATCH format, such as v1.9.2')
+          if (execFileSync('git', ['tag', '--list', tag], { encoding: 'utf8' }).trim()) {
+            throw new Error(`Tag ${tag} already exists`)
+          }
 
-      - name: Create release
+          const packagePath = 'frontend/package.json'
+          const tauriPath = 'src-tauri/tauri.conf.json'
+          const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'))
+          const tauriConfig = JSON.parse(fs.readFileSync(tauriPath, 'utf8'))
+          const version = match.slice(1).join('.')
+
+          packageJson.version = version
+          tauriConfig.version = version
+          fs.writeFileSync(packagePath, `${JSON.stringify(packageJson, null, 2)}\n`)
+          fs.writeFileSync(tauriPath, `${JSON.stringify(tauriConfig, null, 2)}\n`)
+
+          const cargoPath = 'src-tauri/Cargo.toml'
+          const cargoManifest = fs.readFileSync(cargoPath, 'utf8')
+          fs.writeFileSync(cargoPath, cargoManifest.replace(/^version = "[^"]+"/m, `version = "${version}"`))
+
+          const lockPath = 'src-tauri/Cargo.lock'
+          const lockfile = fs.readFileSync(lockPath, 'utf8')
+          const updatedLockfile = lockfile.replace(
+            /(\[\[package\]\]\nname = "DataSmith"\nversion = ")[^"]+("/,
+            `$1${version}$2`,
+          )
+          if (updatedLockfile === lockfile) throw new Error('Could not update DataSmith in Cargo.lock')
+          fs.writeFileSync(lockPath, updatedLockfile)
+
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `tag_name=${tag}\n`)
+          NODE
+
+          RELEASE_TAG=$(node -p "'v' + require('./frontend/package.json').version")
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/package.json src-tauri/tauri.conf.json src-tauri/Cargo.toml src-tauri/Cargo.lock
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: release ${RELEASE_TAG}"
+            git push origin "HEAD:${GITHUB_REF_NAME}"
+          fi
+          git tag -a "$RELEASE_TAG" -m "Release $RELEASE_TAG"
+          git push origin "$RELEASE_TAG"
+
+      - name: Create draft release
         id: create-release
-        uses: actions/github-script@v6
+        uses: actions/github-script@v7
+        env:
+          release_tag: ${{ steps.release-version.outputs.tag_name }}
         with:
           script: |
             const { data } = await github.rest.repos.createRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              tag_name: `v${process.env.PACKAGE_VERSION}`,
-              name: `v${process.env.PACKAGE_VERSION}`,
+              tag_name: process.env.release_tag,
+              name: process.env.release_tag,
               body: '*This release was generated automatically using GitHub Actions.*',
               draft: true,
               prerelease: false
@@ -53,8 +109,10 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
     steps:
-      - name: Checkout repository
+      - name: Checkout release tag
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.create-release.outputs.tag_name }}
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -112,13 +170,12 @@ jobs:
 
     steps:
       - name: Publish release
-        id: publish-release
         uses: actions/github-script@v7
         env:
           release_id: ${{ needs.create-release.outputs.release_id }}
         with:
           script: |
-            github.rest.repos.updateRelease({
+            await github.rest.repos.updateRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
               release_id: process.env.release_id,
