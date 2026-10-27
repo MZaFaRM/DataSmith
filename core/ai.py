@@ -287,7 +287,8 @@ class AiService:
             "Create a synthetic data generation plan for the one provided table. "
             "Return every provided column exactly once. Keep foreign-key and "
             "database-managed columns consistent with their metadata. Use only "
-            "generator names from the provided list for ordinary columns. Set "
+            "one exact generator name from the provided list for every ordinary "
+            "column; never use a generic label such as 'faker'. Set "
             "the row count based on the user's request, defaulting to 50 when "
             "unspecified. Do not return generated values or sample rows."
         )
@@ -437,6 +438,8 @@ class AiService:
         table: dict, result: dict, generators: list[str]
     ) -> dict:
         allowed_generators = set(generators)
+        if not allowed_generators:
+            raise ValueError("No Faker methods are available to create a table plan.")
         try:
             row_count = max(1, min(int(result.get("no_of_entries", 50)), 10_000))
         except (TypeError, ValueError):
@@ -466,8 +469,16 @@ class AiService:
                 generator_type = "faker"
                 model_column = model_columns.get(column["name"], {})
                 candidate = model_column.get("generator")
-                generator = candidate if candidate in allowed_generators else None
+                generator = (
+                    candidate
+                    if isinstance(candidate, str) and candidate in allowed_generators
+                    else AiService._fallback_faker_generator(
+                        column, allowed_generators
+                    )
+                )
                 reason = str(model_column.get("reason", "Choose a generator in the table"))[:240]
+                if generator != candidate:
+                    reason = f"{reason}. Using {generator} as a valid Faker fallback."
 
             normalized_columns.append(
                 {
@@ -482,3 +493,45 @@ class AiService:
             "no_of_entries": row_count,
             "columns": normalized_columns,
         }
+
+    @staticmethod
+    def _fallback_faker_generator(column: dict, allowed_generators: set[str]) -> str:
+        name = str(column.get("name", "")).lower()
+        column_type = str(column.get("type", "")).lower()
+
+        preferences = []
+        if "bool" in column_type:
+            preferences = ["boolean"]
+        elif any(part in column_type for part in ("int", "numeric", "decimal")):
+            preferences = ["random_int", "pyint"]
+        elif any(part in column_type for part in ("float", "real", "double")):
+            preferences = ["pyfloat", "random_number"]
+        elif "datetime" in column_type or "timestamp" in column_type:
+            preferences = ["date_time"]
+        elif column_type == "date" or column_type.endswith(".date"):
+            preferences = ["date"]
+        elif column_type == "time" or column_type.endswith(".time"):
+            preferences = ["time"]
+
+        semantic_preferences = (
+            (("email", "mail"), "email"),
+            (("phone", "mobile", "telephone", "tel"), "phone_number"),
+            (("first_name", "given_name"), "first_name"),
+            (("last_name", "family_name", "surname"), "last_name"),
+            (("name", "person"), "name"),
+            (("address", "street"), "address"),
+            (("city",), "city"),
+            (("country",), "country"),
+            (("company", "organization", "organisation"), "company"),
+            (("url", "website"), "url"),
+            (("uuid",), "uuid4"),
+        )
+        for tokens, method in semantic_preferences:
+            if any(token in name for token in tokens):
+                preferences.append(method)
+
+        preferences.append("word")
+        for method in preferences:
+            if method in allowed_generators:
+                return method
+        return sorted(allowed_generators)[0]

@@ -258,15 +258,6 @@ export default function InsertionPanel({
           width: availableWidth,
         }}
       >
-        {dbCreds && (
-          <div className="mb-3 flex justify-end">
-            <DatabaseAiDialog
-              generators={fakerMethods}
-              tableName={tableData?.name ?? null}
-              onApply={applyAiTablePlan}
-            />
-          </div>
-        )}
         <div>
           {!activeTable ? (
             <>
@@ -339,7 +330,14 @@ export default function InsertionPanel({
                   </div>
                 </div>
               </div>
-              <div>
+              <div className="flex items-center gap-2">
+                {dbCreds && (
+                  <DatabaseAiDialog
+                    generators={fakerMethods}
+                    tableName={tableData?.name ?? null}
+                    onApply={applyAiTablePlan}
+                  />
+                )}
                 <HandleTransaction
                   onTransactionSuccess={onInserted}
                   pendingWrites={pendingWrites}
