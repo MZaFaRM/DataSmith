@@ -59,11 +59,11 @@ jobs:
 
           const lockPath = 'src-tauri/Cargo.lock'
           const lockfile = fs.readFileSync(lockPath, 'utf8')
-          const updatedLockfile = lockfile.replace(
-            /(\[\[package\]\]\nname = "DataSmith"\nversion = ")[^"]+(\")/,
-            `$1${version}$2`,
-          )
-          if (updatedLockfile === lockfile) throw new Error('Could not update DataSmith in Cargo.lock')
+          const packageVersionPattern = /(\[\[package\]\]\r?\nname = "DataSmith"\r?\nversion = ")[^"]+(\")/
+          if (!packageVersionPattern.test(lockfile)) {
+            throw new Error('Could not find DataSmith in Cargo.lock')
+          }
+          const updatedLockfile = lockfile.replace(packageVersionPattern, `$1${version}$2`)
           fs.writeFileSync(lockPath, updatedLockfile)
 
           fs.appendFileSync(process.env.GITHUB_OUTPUT, `tag_name=${tag}\n`)
@@ -184,3 +184,63 @@ jobs:
               draft: false,
               prerelease: false
             })
+
+  cleanup-failed-release:
+    if: ${{ failure() }}
+    needs: [create-release, build-tauri, publish-release]
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Delete failed draft release and generated tag
+        uses: actions/github-script@v7
+        env:
+          RELEASE_TAG: ${{ needs.create-release.outputs.tag_name }}
+        with:
+          script: |
+            const tag = process.env.RELEASE_TAG
+            if (!tag) {
+              core.notice('No release tag was created; nothing to clean up.')
+              return
+            }
+
+            try {
+              const { data: release } = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag
+              })
+
+              if (!release.draft) {
+                core.notice(`Release ${tag} is already published; keeping it and its tag.`)
+                return
+              }
+
+              await github.rest.repos.deleteRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                release_id: release.id
+              })
+              core.info(`Deleted draft release ${tag}.`)
+            } catch (error) {
+              if (error.status !== 404) throw error
+              core.info(`No release draft exists for ${tag}.`)
+            }
+
+            try {
+              await github.rest.git.getRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `tags/${tag}`
+              })
+              await github.rest.git.deleteRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `tags/${tag}`
+              })
+              core.info(`Deleted generated tag ${tag}.`)
+            } catch (error) {
+              if (error.status !== 404) throw error
+              core.info(`Tag ${tag} does not exist; nothing to delete.`)
+            }
