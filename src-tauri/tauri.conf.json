@@ -1,7 +1,7 @@
 {
   "$schema": "../frontend/node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "DataSmith",
-  "version": "1.9.0",
+  "version": "1.9.5",
   "identifier": "com.mzafarm.datasmith",
   "build": {
     "frontendDist": "../frontend/dist",
@@ -31,7 +31,9 @@
     "publisher": "MZaFaRM",
     "active": true,
     "targets": "all",
-    "externalBin": ["../sidecar/populator"],
+    "externalBin": [
+      "../sidecar/populator"
+    ],
     "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
@@ -42,7 +44,10 @@
     ]
   },
   "plugins": {
-    "permissions": ["dialog:default", "dialogue:allow-save"],
+    "permissions": [
+      "dialog:default",
+      "dialogue:allow-save"
+    ],
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERBQTE2NDE1MjA1RjVGNjgKUldSb1gxOGdGV1NoMnA0OUhFSmpTN1JaVTMzM1UvelEvMnd0ZEw3Tmx2UENQSWhqb25scXl3R3gK",
       "endpoints": [
